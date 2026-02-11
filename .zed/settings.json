@@ -1,0 +1,14 @@
+{
+  "languages": {
+    "Svelte": {
+      "inlay_hints": {
+        "enabled": true
+      },
+      "show_whitespaces": "boundary"
+    }
+  },
+  "prettier": {
+    "allowed": true
+  },
+  "project_name": "Serial Stamp"
+}
