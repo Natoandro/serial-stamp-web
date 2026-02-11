@@ -1,9 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-
-	async function handleCancel() {
-		await goto('/');
-	}
+	import Button from '$lib/components/ui/Button.svelte';
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -11,12 +7,7 @@
 		<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
 			<div class="flex items-center justify-between">
 				<h1 class="text-3xl font-bold tracking-tight text-gray-900">New Project</h1>
-				<button
-					onclick={handleCancel}
-					class="rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset hover:bg-gray-50"
-				>
-					Cancel
-				</button>
+				<Button href="/" variant="secondary">Cancel</Button>
 			</div>
 		</div>
 	</header>

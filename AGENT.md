@@ -28,12 +28,19 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - This is a web app to add “stamps” onto an image (e.g., ticket numbering, barcodes/QR codes) where many tickets are printed on a large sheet then cut.
 - Prefer features that support batch generation, precise placement, and print-ready output.
 
-## 5) Code quality defaults
+## 5) UI component library discipline
+- Always extract reusable UI elements into dedicated components.
+- SVG icons must be in their own components (e.g., `IconTrash.svelte`, `IconPlus.svelte`).
+- Build a consistent component library under `src/lib/components/ui/` for buttons, inputs, modals, etc.
+- Prefer composable, small components over large monolithic ones.
+- Use `<a>` tags with proper styling for navigation instead of buttons with `goto()` handlers.
+
+## 6) Code quality defaults
 - Keep changes minimal and focused.
 - Prefer small, composable modules over one large file.
 - Maintain formatting/linting expectations (Prettier/ESLint).
 - Avoid introducing dependencies unless they clearly reduce complexity or are needed for correctness.
 
-## 6) Safety & correctness
+## 7) Safety & correctness
 - Avoid destructive operations unless explicitly requested.
 - Validate assumptions; if key product behavior is ambiguous (e.g., coordinate system, DPI/print scaling, barcode formats), ask concise clarifying questions before implementing.

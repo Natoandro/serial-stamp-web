@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { getProject } from '$lib/data/projects';
 	import type { Project } from '$lib/types';
+	import Button from '$lib/components/ui/Button.svelte';
+	import IconArrowLeft from '$lib/components/icons/IconArrowLeft.svelte';
 
 	let project = $state<Project | null>(null);
 	let loading = $state(true);
@@ -39,14 +40,6 @@
 			loading = false;
 		}
 	}
-
-	async function handleBack() {
-		await goto('/');
-	}
-
-	async function handleSheetLayout() {
-		await goto(`/projects/${projectId}/sheet`);
-	}
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -54,31 +47,15 @@
 		<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-4">
-					<button
-						onclick={handleBack}
-						class="rounded-md p-2 text-gray-400 hover:text-gray-600"
-						aria-label="Back to projects"
-					>
-						<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M10 19l-7-7m0 0l7-7m-7 7h18"
-							/>
-						</svg>
-					</button>
+					<Button href="/" variant="ghost" class="p-2" aria-label="Back to projects">
+						<IconArrowLeft />
+					</Button>
 					<h1 class="text-3xl font-bold tracking-tight text-gray-900">
 						{project?.name || 'Loading...'}
 					</h1>
 				</div>
 				{#if project}
-					<button
-						onclick={handleSheetLayout}
-						class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
-					>
-						Sheet Layout
-					</button>
+					<Button href="/projects/{projectId}/sheet">Sheet Layout</Button>
 				{/if}
 			</div>
 		</div>
@@ -92,12 +69,7 @@
 		{:else if error}
 			<div class="rounded-lg border border-red-200 bg-red-50 p-8 text-center">
 				<p class="text-red-600">{error}</p>
-				<button
-					onclick={handleBack}
-					class="mt-4 rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-red-300 ring-inset hover:bg-gray-50"
-				>
-					Back to Projects
-				</button>
+				<Button href="/" variant="secondary" class="mt-4">Back to Projects</Button>
 			</div>
 		{:else}
 			<div class="rounded-lg border border-gray-200 bg-white p-8 text-center">
