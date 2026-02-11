@@ -1,0 +1,16 @@
+- SvelteKit app with static adapter, planned to be deployed on GitHub Pages.
+- Using IndexedDB via Dexie.js; only client-side data storage.
+- Each project is identified by a unique `projectId` (UUID) and contains.
+- New projects will be created with a wizard-like UX, guiding users through steps to set up their sheet and stamps.
+- Steps will first focus on single tickets:
+  - Project name and ticket template image (upload)
+  - Data sources: CSV table, sequential numbering (eventually multi-dimensional), or random generation.
+  - Stamps:
+    - text: with template variables (e.g., `{{number}}`) and styling options (font, size, color)
+    - barcode/QR code: with data template variables and format options
+    Stamps will be positioned on the ticket using a drag-and-drop interface.
+- After setting up a single ticket, users can choose to generate a grid of tickets on a sheet, specifying paper size, rows/columns and spacing (inner spacing and margin).
+- The final output will be a print-ready PDF.
+- When focusing on single tickets, the UI will always show a preview of the ticket rendered in a canvas.
+- When working on the sheet layout, the UI will show a preview of the entire sheet with all tickets, rendered in a canvas.
+- When exporting, the app will generate a PDF with the sheet layout, ensuring high resolution for print quality. It will use printpdf Rust crate via WebAssembly for PDF generation, and will handle scaling to ensure the output matches the specified paper size and DPI.
