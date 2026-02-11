@@ -1,42 +1,60 @@
-# sv
+# Serial Stamp
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Serial Stamp is a web app for adding “stamps” onto an image — e.g. ticket numbering, barcodes, QR codes, labels, and other repeated overlays.
 
-## Creating a project
+A common workflow is:
+- Start from a large “sheet” image intended for printing
+- Place stamps at precise positions (often as a grid)
+- Generate many unique tickets on one sheet
+- Print the sheet and cut it afterward
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Tech stack
 
-```sh
-# create a new project
-npx sv create my-app
+- SvelteKit (Svelte 5)
+- Vite
+- TypeScript
+- Tailwind CSS
+
+## Development
+
+Install dependencies (the repo uses pnpm):
+
+```/dev/null/sh#L1-1
+pnpm install
 ```
 
-To recreate this project with the same configuration:
+Start the dev server:
 
-```sh
-# recreate this project
-pnpm dlx sv create --template minimal --types ts --add prettier eslint tailwindcss="plugins:forms" sveltekit-adapter="adapter:static" mcp="ide:other+setup:local" --install pnpm serial-stamp
+```/dev/null/sh#L1-1
+pnpm dev
 ```
 
-## Developing
+## Scripts
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+These are the available scripts (from `package.json`):
 
-```sh
-npm run dev
+- `dev`: start the Vite dev server
+- `build`: create a production build
+- `preview`: preview the production build locally
+- `prepare`: run SvelteKit sync (used by tooling)
+- `check`: run SvelteKit sync + `svelte-check`
+- `check:watch`: same as `check`, in watch mode
+- `lint`: run Prettier check + ESLint
+- `format`: run Prettier write
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+Run them with pnpm, e.g.:
+
+```/dev/null/sh#L1-7
+pnpm build
+pnpm preview
+
+pnpm check
+pnpm check:watch
+
+pnpm lint
+pnpm format
 ```
 
-## Building
+## Notes
 
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Keep documentation concise and prefer self-explanatory code and naming. This project targets Svelte 5 (use runes; avoid legacy store patterns).
