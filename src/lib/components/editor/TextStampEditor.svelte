@@ -24,6 +24,12 @@
 		{ value: 'right', label: 'Right' }
 	];
 
+	const verticalAlignments = [
+		{ value: 'top', label: 'Top' },
+		{ value: 'middle', label: 'Middle' },
+		{ value: 'bottom', label: 'Bottom' }
+	];
+
 	function insertVariable(variable: string) {
 		const placeholder = `{{${variable}}}`;
 		onUpdate({ template: stamp.template + placeholder });
@@ -123,26 +129,61 @@
 		</div>
 	</div>
 
-	<div class="grid grid-cols-2 gap-4">
-		<div>
-			<label for="width" class="block text-sm font-medium text-gray-700">Width (px)</label>
-			<input
-				type="number"
-				id="width"
-				class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-				value={stamp.width}
-				oninput={(e) => onUpdate({ width: parseInt(e.currentTarget.value) || 0 })}
-			/>
-		</div>
-		<div>
-			<label for="height" class="block text-sm font-medium text-gray-700">Height (px)</label>
-			<input
-				type="number"
-				id="height"
-				class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-				value={stamp.height}
-				oninput={(e) => onUpdate({ height: parseInt(e.currentTarget.value) || 0 })}
-			/>
+	<div>
+		<label for="verticalAlignment" class="block text-sm font-medium text-gray-700"
+			>Vertical Alignment</label
+		>
+		<div class="mt-1">
+			<div class="flex rounded-md shadow-sm" role="group">
+				{#each verticalAlignments as align (align.value)}
+					<button
+						type="button"
+						onclick={() => onUpdate({ verticalAlign: align.value as 'top' | 'middle' | 'bottom' })}
+						class="flex-1 border border-gray-300 px-3 py-2 text-sm font-medium first:rounded-l-md last:rounded-r-md hover:bg-gray-50 focus:z-10 {(stamp.verticalAlign ||
+							'top') === align.value
+							? 'border-blue-500 bg-blue-50 text-blue-700'
+							: 'bg-white text-gray-700'}"
+					>
+						{align.label}
+					</button>
+				{/each}
+			</div>
 		</div>
 	</div>
+
+	<div class="flex items-center">
+		<input
+			id="autoSize"
+			type="checkbox"
+			class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+			checked={stamp.autoSize || false}
+			onchange={(e) => onUpdate({ autoSize: e.currentTarget.checked })}
+		/>
+		<label for="autoSize" class="ml-2 block text-sm text-gray-900"> Auto-size to content </label>
+	</div>
+
+	{#if !stamp.autoSize}
+		<div class="grid grid-cols-2 gap-4">
+			<div>
+				<label for="width" class="block text-sm font-medium text-gray-700">Width (px)</label>
+				<input
+					type="number"
+					id="width"
+					class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+					value={stamp.width}
+					oninput={(e) => onUpdate({ width: parseInt(e.currentTarget.value) || 0 })}
+				/>
+			</div>
+			<div>
+				<label for="height" class="block text-sm font-medium text-gray-700">Height (px)</label>
+				<input
+					type="number"
+					id="height"
+					class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+					value={stamp.height}
+					oninput={(e) => onUpdate({ height: parseInt(e.currentTarget.value) || 0 })}
+				/>
+			</div>
+		</div>
+	{/if}
 </div>

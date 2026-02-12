@@ -65,25 +65,43 @@ export class TicketRenderer {
 
 		ctx.font = `${stamp.fontSize}px ${stamp.fontFamily}`;
 		ctx.fillStyle = stamp.color;
-		ctx.textBaseline = 'top';
 
 		let x = stamp.x;
-		const y = stamp.y;
+		let y = stamp.y;
 
-		if (stamp.alignment === 'center') {
-			ctx.textAlign = 'center';
-			x += stamp.width / 2;
-		} else if (stamp.alignment === 'right') {
-			ctx.textAlign = 'right';
-			x += stamp.width;
+		if (stamp.autoSize) {
+			// Auto-size: (x,y) is the anchor point
+			ctx.textBaseline = stamp.verticalAlign || 'top';
+			ctx.textAlign = stamp.alignment;
 		} else {
-			ctx.textAlign = 'left';
-		}
+			// Fixed-size box: (x,y) is top-left corner
+			// Horizontal alignment within box
+			if (stamp.alignment === 'center') {
+				ctx.textAlign = 'center';
+				x += stamp.width / 2;
+			} else if (stamp.alignment === 'right') {
+				ctx.textAlign = 'right';
+				x += stamp.width;
+			} else {
+				ctx.textAlign = 'left';
+			}
 
-		// Ensure text stays within stamp bounds if possible (basic clipping)
-		ctx.beginPath();
-		ctx.rect(stamp.x, stamp.y, stamp.width, stamp.height);
-		ctx.clip();
+			// Vertical alignment within box
+			if (stamp.verticalAlign === 'middle') {
+				ctx.textBaseline = 'middle';
+				y += stamp.height / 2;
+			} else if (stamp.verticalAlign === 'bottom') {
+				ctx.textBaseline = 'bottom';
+				y += stamp.height;
+			} else {
+				ctx.textBaseline = 'top';
+			}
+
+			// Clipping only for fixed size
+			ctx.beginPath();
+			ctx.rect(stamp.x, stamp.y, stamp.width, stamp.height);
+			ctx.clip();
+		}
 
 		ctx.fillText(text, x, y);
 	}
@@ -117,5 +135,28 @@ export class TicketRenderer {
 	 */
 	public setStamps(stamps: Stamp[]): void {
 		this.stamps = stamps;
+	}
+
+	/**
+	 * Measures the dimensions of a text stamp.
+	 */
+	public measureText(
+		stamp: TextStamp,
+		record: Record<string, string>
+	): { width: number; height: number } {
+		const { ctx } = this;
+		const text = resolveTemplate(stamp.template, record);
+
+		ctx.save();
+		ctx.font = `${stamp.fontSize}px ${stamp.fontFamily}`;
+		const metrics = ctx.measureText(text);
+		// Use fontSize for height to ensure stable bounding box matching baseline logic
+		const height = stamp.fontSize;
+		ctx.restore();
+
+		return {
+			width: metrics.width,
+			height: height
+		};
 	}
 }

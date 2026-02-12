@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import type { Project, Stamp } from '$lib/types';
+	import type { Project, Stamp, TextStamp } from '$lib/types';
 	import { TicketRenderer } from '$lib/canvas/TicketRenderer';
 	import { blobToImageBitmap } from '$lib/utils/image';
 
@@ -10,6 +10,14 @@
 		selectedStampId?: string | null;
 		onSelectStamp?: (id: string | null) => void;
 		onUpdateStamp?: (stamp: Stamp) => void;
+		onDimensionsChange?: (id: string, width: number, height: number) => void;
+	}
+
+	export function getStampDimensions(stamp: Stamp) {
+		if (stamp.type === 'text' && renderer) {
+			return renderer.measureText(stamp as TextStamp, selectedRecord);
+		}
+		return { width: stamp.width, height: stamp.height };
 	}
 
 	let {
@@ -17,7 +25,8 @@
 		selectedRecord,
 		selectedStampId = null,
 		onSelectStamp,
-		onUpdateStamp
+		onUpdateStamp,
+		onDimensionsChange
 	}: Props = $props();
 
 	let canvasElement = $state<HTMLCanvasElement | null>(null);
@@ -41,10 +50,14 @@
 
 	// Sync local stamps when project stamps change (from external updates)
 	$effect(() => {
-		// We only want to sync when NOT dragging to avoid jumping
-		if (!isDragging) {
-			localStamps = project.stamps;
-		}
+		const stamps = project.stamps;
+		// We use untrack to ensure this effect ONLY runs when stamps change,
+		// not when isDragging changes (which would cause a revert to old data on mouseup).
+		untrack(() => {
+			if (!isDragging) {
+				localStamps = stamps;
+			}
+		});
 	});
 
 	// The renderer helper
@@ -120,10 +133,47 @@
 
 				renderer.render(record).then(() => {
 					drawSelectionOverlay(ctx, stamps, stampId, dpi);
+
+					// Sync measured dimensions back to parent if needed
+					stamps.forEach((s) => {
+						if (s.type === 'text' && (s as TextStamp).autoSize) {
+							const dims = renderer!.measureText(s as TextStamp, record);
+							if (
+								Math.round(s.width) !== Math.round(dims.width) ||
+								Math.round(s.height) !== Math.round(dims.height)
+							) {
+								// Update locally to avoid flicker
+								s.width = dims.width;
+								s.height = dims.height;
+								// Notify parent
+								onDimensionsChange?.(s.id, dims.width, dims.height);
+							}
+						}
+					});
 				});
 			}
 		});
 	});
+
+	function getVisualBounds(stamp: Stamp) {
+		if (stamp.type === 'text' && (stamp as TextStamp).autoSize && renderer) {
+			const dims = renderer.measureText(stamp as TextStamp, selectedRecord);
+			let x = stamp.x;
+			let y = stamp.y;
+
+			// Adjust x based on alignment
+			if (stamp.alignment === 'center') x -= dims.width / 2;
+			else if (stamp.alignment === 'right') x -= dims.width;
+
+			// Adjust y based on verticalAlign
+			const vAlign = (stamp as TextStamp).verticalAlign;
+			if (vAlign === 'middle') y -= dims.height / 2;
+			else if (vAlign === 'bottom') y -= dims.height;
+
+			return { x, y, width: dims.width, height: dims.height };
+		}
+		return { x: stamp.x, y: stamp.y, width: stamp.width, height: stamp.height };
+	}
 
 	function drawSelectionOverlay(
 		ctx: CanvasRenderingContext2D,
@@ -136,6 +186,8 @@
 		const stamp = stamps.find((s) => s.id === stampId);
 		if (!stamp) return;
 
+		const bounds = getVisualBounds(stamp);
+
 		ctx.save();
 		ctx.scale(dpi, dpi);
 
@@ -143,36 +195,44 @@
 		ctx.strokeStyle = '#3b82f6';
 		ctx.lineWidth = 2;
 		ctx.setLineDash([5, 5]);
-		ctx.strokeRect(stamp.x - 2, stamp.y - 2, stamp.width + 4, stamp.height + 4);
+		ctx.strokeRect(bounds.x - 2, bounds.y - 2, bounds.width + 4, bounds.height + 4);
 
-		// Handles
-		ctx.fillStyle = '#3b82f6';
-		const handleSize = 6;
-		const corners = [
-			[stamp.x, stamp.y],
-			[stamp.x + stamp.width, stamp.y],
-			[stamp.x, stamp.y + stamp.height],
-			[stamp.x + stamp.width, stamp.y + stamp.height]
-		];
+		// Handles (only show if not auto-sized)
+		if (stamp.type !== 'text' || !(stamp as TextStamp).autoSize) {
+			ctx.fillStyle = '#3b82f6';
+			const handleSize = 6;
+			const corners = [
+				[bounds.x, bounds.y],
+				[bounds.x + bounds.width, bounds.y],
+				[bounds.x, bounds.y + bounds.height],
+				[bounds.x + bounds.width, bounds.y + bounds.height]
+			];
 
-		for (const [cx, cy] of corners) {
-			ctx.fillRect(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize);
+			for (const [cx, cy] of corners) {
+				ctx.fillRect(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize);
+			}
 		}
+
+		// Draw anchor point
+		ctx.fillStyle = '#ef4444'; // red-500
+		ctx.beginPath();
+		ctx.arc(stamp.x, stamp.y, 3, 0, Math.PI * 2);
+		ctx.fill();
 
 		ctx.restore();
 	}
 
 	function handleCanvasClick(event: MouseEvent) {
-		if (!canvasElement || !templateImage) return;
+		if (!canvasElement || !templateImage || hasDragged) return;
 
 		const rect = canvasElement.getBoundingClientRect();
 		const x = (event.clientX - rect.left) / scale;
 		const y = (event.clientY - rect.top) / scale;
 
+		// Find stamp under cursor (reverse order to get top-most)
 		const clickedStamp = [...localStamps].reverse().find((stamp) => {
-			return (
-				x >= stamp.x && x <= stamp.x + stamp.width && y >= stamp.y && y <= stamp.y + stamp.height
-			);
+			const b = getVisualBounds(stamp);
+			return x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height;
 		});
 
 		onSelectStamp?.(clickedStamp ? clickedStamp.id : null);
@@ -180,6 +240,7 @@
 
 	// Interaction state
 	let isDragging = $state(false);
+	let hasDragged = false;
 	let dragStartPos = { x: 0, y: 0 };
 	let initialStampPos = { x: 0, y: 0 };
 
@@ -193,8 +254,11 @@
 		const x = (event.clientX - rect.left) / scale;
 		const y = (event.clientY - rect.top) / scale;
 
-		if (x >= stamp.x && x <= stamp.x + stamp.width && y >= stamp.y && y <= stamp.y + stamp.height) {
+		const b = getVisualBounds(stamp);
+
+		if (x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height) {
 			isDragging = true;
+			hasDragged = false;
 			dragStartPos = { x, y };
 			initialStampPos = { x: stamp.x, y: stamp.y };
 
@@ -215,6 +279,10 @@
 
 		const newX = Math.round(initialStampPos.x + dx);
 		const newY = Math.round(initialStampPos.y + dy);
+
+		if (newX !== initialStampPos.x || newY !== initialStampPos.y) {
+			hasDragged = true;
+		}
 
 		// Update local state immediately for 60fps movement
 		localStamps = localStamps.map((s) =>

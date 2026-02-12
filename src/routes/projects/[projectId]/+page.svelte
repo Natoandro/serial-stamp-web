@@ -69,7 +69,8 @@
 				fontFamily: 'Arial, sans-serif',
 				fontSize: 24,
 				color: '#000000',
-				alignment: 'left'
+				alignment: 'left',
+				autoSize: true
 			};
 		} else if (type === 'barcode') {
 			newStamp = {
@@ -119,6 +120,19 @@
 		handleUpdateProject({
 			stamps: project.stamps.map((s) => (s.id === updatedStamp.id ? updatedStamp : s))
 		});
+	}
+
+	function handleDimensionsChange(id: string, width: number, height: number) {
+		if (!project) return;
+		const stamp = project.stamps.find((s) => s.id === id);
+		if (stamp && (Math.abs(stamp.width - width) > 0.1 || Math.abs(stamp.height - height) > 0.1)) {
+			handleUpdateProject(
+				{
+					stamps: project.stamps.map((s) => (s.id === id ? { ...s, width, height } : s))
+				},
+				true
+			);
+		}
 	}
 </script>
 
@@ -184,6 +198,7 @@
 						{selectedStampId}
 						onSelectStamp={(id) => (selectedStampId = id)}
 						onUpdateStamp={handleUpdateStamp}
+						onDimensionsChange={handleDimensionsChange}
 					/>
 				</div>
 			{/if}

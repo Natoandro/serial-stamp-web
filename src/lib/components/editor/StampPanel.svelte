@@ -33,6 +33,50 @@
 		}
 	}
 
+	function handleTextStampUpdate(patch: Partial<TextStamp>) {
+		if (!selectedStamp || selectedStamp.type !== 'text') return;
+
+		const current = selectedStamp as TextStamp;
+		const updates: Partial<TextStamp> = { ...patch };
+
+		// Only adjust coordinates for auto-sized text stamps.
+		// For fixed-size stamps, the box stays put and alignment happens inside.
+		if (current.autoSize) {
+			// Handle horizontal alignment change: keep visual center in place
+			if (patch.alignment && patch.alignment !== current.alignment) {
+				const width = current.width;
+				// Calculate visual left position based on old alignment
+				let visualLeft = current.x;
+				if (current.alignment === 'center') visualLeft = current.x - width / 2;
+				else if (current.alignment === 'right') visualLeft = current.x - width;
+
+				// Calculate new X based on new alignment to match visualLeft
+				if (patch.alignment === 'left') updates.x = visualLeft;
+				else if (patch.alignment === 'center') updates.x = visualLeft + width / 2;
+				else if (patch.alignment === 'right') updates.x = visualLeft + width;
+			}
+
+			// Handle vertical alignment change: keep visual top in place
+			if (patch.verticalAlign && patch.verticalAlign !== current.verticalAlign) {
+				const height = current.height;
+				const oldV = current.verticalAlign || 'top';
+				const newV = patch.verticalAlign;
+
+				// Calculate visual top position based on old alignment
+				let visualTop = current.y;
+				if (oldV === 'middle') visualTop = current.y - height / 2;
+				else if (oldV === 'bottom') visualTop = current.y - height;
+
+				// Calculate new Y based on new alignment to match visualTop
+				if (newV === 'top') updates.y = visualTop;
+				else if (newV === 'middle') updates.y = visualTop + height / 2;
+				else if (newV === 'bottom') updates.y = visualTop + height;
+			}
+		}
+
+		onUpdate({ ...selectedStamp, ...updates } as Stamp);
+	}
+
 	function getStampIcon(type: StampType) {
 		switch (type) {
 			case 'text':
@@ -157,7 +201,7 @@
 									<TextStampEditor
 										stamp={stamp as TextStamp}
 										{availableVariables}
-										onUpdate={handleUpdateStamp}
+										onUpdate={handleTextStampUpdate}
 									/>
 								{:else if stamp.type === 'barcode'}
 									<BarcodeStampEditor

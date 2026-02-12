@@ -22,6 +22,8 @@ export interface TextStamp extends BaseStamp {
 	fontSize: number;
 	color: string;
 	alignment: 'left' | 'center' | 'right';
+	verticalAlign?: 'top' | 'middle' | 'bottom';
+	autoSize?: boolean;
 }
 
 export type BarcodeFormat =
