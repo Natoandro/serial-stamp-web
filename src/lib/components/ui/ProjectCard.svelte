@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import IconTag from '$lib/components/icons/IconTag.svelte';
 	import IconDocument from '$lib/components/icons/IconDocument.svelte';
 	import IconTrash from '$lib/components/icons/IconTrash.svelte';
@@ -12,9 +13,35 @@
 		onDelete?: (project: Project) => void;
 	} = $props();
 
-	function getThumbnailUrl(blob: Blob): string {
-		return URL.createObjectURL(blob);
-	}
+	let thumbnailUrl = $state<string>('');
+
+	$effect(() => {
+		// Clean up previous URL if it exists
+		if (thumbnailUrl) {
+			URL.revokeObjectURL(thumbnailUrl);
+			thumbnailUrl = '';
+		}
+
+		// Create new URL if we have a valid Blob
+		if (
+			project.templateImage &&
+			project.templateImage instanceof Blob &&
+			project.templateImage.size > 0
+		) {
+			try {
+				thumbnailUrl = URL.createObjectURL(project.templateImage);
+			} catch (error) {
+				console.error('Failed to create thumbnail URL:', error);
+				thumbnailUrl = '';
+			}
+		}
+	});
+
+	onDestroy(() => {
+		if (thumbnailUrl) {
+			URL.revokeObjectURL(thumbnailUrl);
+		}
+	});
 
 	function formatDate(date: Date): string {
 		return new Date(date).toLocaleDateString(undefined, {
@@ -38,11 +65,20 @@
 	class="group relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
 >
 	<div class="aspect-4/3 bg-gray-100">
-		<img
-			src={getThumbnailUrl(project.templateImage)}
-			alt={project.eventName}
-			class="h-full w-full object-contain"
-		/>
+		{#if thumbnailUrl}
+			<img src={thumbnailUrl} alt={project.eventName} class="h-full w-full object-contain" />
+		{:else}
+			<div class="flex h-full w-full items-center justify-center text-gray-400">
+				<svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+					/>
+				</svg>
+			</div>
+		{/if}
 	</div>
 	<div class="flex flex-1 flex-col p-4">
 		<h3 class="text-lg font-semibold text-gray-900">{project.eventName}</h3>
