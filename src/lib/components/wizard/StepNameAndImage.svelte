@@ -66,21 +66,19 @@
 				required
 			/>
 
-			<div class="grid gap-6 md:grid-cols-2">
-				<TextInput
-					bind:value={eventOrganizer}
-					label="Event Organizer"
-					placeholder="e.g., City Arts Council"
-					required
-				/>
+			<TextInput
+				bind:value={eventOrganizer}
+				label="Event Organizer"
+				placeholder="e.g., City Arts Council"
+				required
+			/>
 
-				<TextInput
-					bind:value={ticketType}
-					label="Ticket Type"
-					placeholder="e.g., General Admission, VIP, Student"
-					required
-				/>
-			</div>
+			<TextInput
+				bind:value={ticketType}
+				label="Ticket Type"
+				placeholder="e.g., General Admission, VIP, Student"
+				required
+			/>
 
 			<FileUpload
 				bind:file={templateImage}
@@ -98,13 +96,6 @@
 				<div class="mb-2 block text-sm font-medium text-gray-700">
 					Event Date <span class="text-red-500">*</span>
 				</div>
-				<Calendar bind:value={eventDate} min={today} />
-			</div>
-
-			<div>
-				<label for="selected-date" class="mb-2 block text-sm font-medium text-gray-700">
-					Selected Date
-				</label>
 				<input
 					type="text"
 					id="selected-date"
@@ -117,8 +108,9 @@
 							})
 						: 'No date selected'}
 					readonly
-					class="block w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm"
+					class="mb-4 block w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-center text-sm font-medium text-gray-900 shadow-sm"
 				/>
+				<Calendar bind:value={eventDate} min={today} />
 				{#if !eventDate}
 					<p class="mt-2 text-sm text-gray-500">Please select a date from the calendar.</p>
 				{/if}
