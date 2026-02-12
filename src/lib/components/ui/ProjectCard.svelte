@@ -51,7 +51,6 @@
 		e.preventDefault();
 		e.stopPropagation();
 		e.stopImmediatePropagation();
-		console.log('Delete button clicked for project:', project.id);
 		if (onDelete) {
 			onDelete(project);
 		}
