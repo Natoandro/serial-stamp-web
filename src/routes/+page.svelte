@@ -92,7 +92,7 @@
 		{:else if projectsQuery.data}
 			<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				{#each projectsQuery.data as project (project.id)}
-					<ProjectCard {project} onDelete={() => confirmDelete(project)} />
+					<ProjectCard {project} onDelete={confirmDelete} />
 				{/each}
 			</div>
 		{/if}
