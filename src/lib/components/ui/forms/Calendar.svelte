@@ -189,7 +189,7 @@
 				onclick={() => selectDate(dateString)}
 				{disabled}
 				class={cn(
-					'flex h-10 w-10 items-center justify-center rounded-md text-sm transition-colors focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none',
+					'flex h-10 w-10 items-center justify-center rounded-md text-center text-sm transition-colors focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none',
 					!isCurrentMonth && 'text-gray-400',
 					isCurrentMonth && !selected && !disabled && 'text-gray-900 hover:bg-gray-100',
 					selected && 'bg-blue-600 font-semibold text-white hover:bg-blue-700',

@@ -10,7 +10,7 @@
 
 	const steps: Array<{ label: string; component: Component }> = [
 		{
-			label: 'Project Info',
+			label: 'Event & Ticket Info',
 			component: StepNameAndImage as unknown as Component
 		},
 		{

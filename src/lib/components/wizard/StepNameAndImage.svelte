@@ -82,7 +82,31 @@
 			<div class="mb-2 block text-sm font-medium text-gray-700">
 				Event Date <span class="text-red-500">*</span>
 			</div>
-			<Calendar bind:value={eventDate} />
+			<div class="grid gap-6 lg:grid-cols-2">
+				<Calendar bind:value={eventDate} />
+				<div class="flex flex-col justify-center">
+					<label for="selected-date" class="mb-2 block text-sm font-medium text-gray-700">
+						Selected Date
+					</label>
+					<input
+						type="text"
+						id="selected-date"
+						value={eventDate
+							? new Date(eventDate).toLocaleDateString(undefined, {
+									weekday: 'long',
+									year: 'numeric',
+									month: 'long',
+									day: 'numeric'
+								})
+							: 'No date selected'}
+						readonly
+						class="block w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm"
+					/>
+					{#if !eventDate}
+						<p class="mt-2 text-sm text-gray-500">Please select a date from the calendar.</p>
+					{/if}
+				</div>
+			</div>
 		</div>
 
 		<FileUpload
