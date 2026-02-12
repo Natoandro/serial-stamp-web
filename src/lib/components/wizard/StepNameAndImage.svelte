@@ -66,19 +66,21 @@
 				required
 			/>
 
-			<TextInput
-				bind:value={eventOrganizer}
-				label="Event Organizer"
-				placeholder="e.g., City Arts Council"
-				required
-			/>
+			<div class="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
+				<TextInput
+					bind:value={eventOrganizer}
+					label="Event Organizer"
+					placeholder="e.g., City Arts Council"
+					required
+				/>
 
-			<TextInput
-				bind:value={ticketType}
-				label="Ticket Type"
-				placeholder="e.g., General Admission, VIP, Student"
-				required
-			/>
+				<TextInput
+					bind:value={ticketType}
+					label="Ticket Type"
+					placeholder="e.g., General Admission, VIP, Student"
+					required
+				/>
+			</div>
 
 			<FileUpload
 				bind:file={templateImage}
