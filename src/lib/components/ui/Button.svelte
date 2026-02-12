@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { cn } from '$lib/utils/cn';
+
 	type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 	type ButtonSize = 'sm' | 'md' | 'lg';
 
@@ -35,9 +37,7 @@
 		lg: 'px-6 py-3 text-base'
 	};
 
-	const classes = $derived(
-		`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`
-	);
+	const classes = $derived(cn(baseClasses, variantClasses[variant], sizeClasses[size], className));
 </script>
 
 {#if href}

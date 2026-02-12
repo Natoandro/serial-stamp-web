@@ -4,16 +4,21 @@
 	import type { Project } from '$lib/types';
 	import Button from '$lib/components/ui/Button.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
-	import Modal from '$lib/components/ui/Modal.svelte';
+	import ModalConfirm from '$lib/components/ui/ModalConfirm.svelte';
 	import ProjectCard from '$lib/components/ui/ProjectCard.svelte';
 	import IconPlus from '$lib/components/icons/IconPlus.svelte';
 	import IconFolder from '$lib/components/icons/IconFolder.svelte';
-	import IconWarning from '$lib/components/icons/IconWarning.svelte';
 
 	let projects = $state<Project[]>([]);
 	let loading = $state(true);
 	let projectToDelete = $state<Project | null>(null);
 	let showDeleteModal = $state(false);
+
+	const deleteMessage = $derived(
+		projectToDelete
+			? `Are you sure you want to delete "${projectToDelete.name}"? This action cannot be undone.`
+			: ''
+	);
 
 	onMount(async () => {
 		await loadProjects();
@@ -35,18 +40,14 @@
 		showDeleteModal = true;
 	}
 
-	function cancelDelete() {
-		projectToDelete = null;
-		showDeleteModal = false;
-	}
-
 	async function handleDelete() {
 		if (!projectToDelete) return;
 
 		try {
 			await deleteProject(projectToDelete.id);
 			await loadProjects();
-			cancelDelete();
+			showDeleteModal = false;
+			projectToDelete = null;
 		} catch (error) {
 			console.error('Failed to delete project:', error);
 		}
@@ -90,22 +91,11 @@
 	</main>
 </div>
 
-<Modal bind:open={showDeleteModal} title="Delete project" onClose={cancelDelete}>
-	<div class="sm:flex sm:items-start">
-		<div
-			class="mx-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10"
-		>
-			<IconWarning class="h-6 w-6 text-red-600" />
-		</div>
-		<div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-			<p class="text-sm text-gray-500">
-				Are you sure you want to delete "{projectToDelete?.name}"? This action cannot be undone.
-			</p>
-		</div>
-	</div>
-
-	{#snippet actions()}
-		<Button variant="danger" onclick={handleDelete}>Delete</Button>
-		<Button variant="secondary" onclick={cancelDelete}>Cancel</Button>
-	{/snippet}
-</Modal>
+<ModalConfirm
+	bind:open={showDeleteModal}
+	title="Delete project"
+	description={deleteMessage}
+	confirmLabel="Delete"
+	variant="danger"
+	onConfirm={handleDelete}
+/>

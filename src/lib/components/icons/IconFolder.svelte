@@ -1,8 +1,16 @@
 <script lang="ts">
-	let { class: className = 'h-12 w-12', ...props }: { class?: string; [key: string]: any } = $props();
+	import { cn } from '$lib/utils/cn';
+
+	let { class: className, ...props }: { class?: string; [key: string]: any } = $props();
 </script>
 
-<svg class={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
+<svg
+	class={cn('h-12 w-12', className)}
+	fill="none"
+	viewBox="0 0 24 24"
+	stroke="currentColor"
+	{...props}
+>
 	<path
 		vector-effect="non-scaling-stroke"
 		stroke-linecap="round"
