@@ -28,7 +28,7 @@
 			class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0"
 		>
 			<button
-				class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+				class="bg-opacity-75 fixed inset-0 bg-gray-500 transition-opacity"
 				onclick={handleBackdropClick}
 				aria-label="Close modal"
 			></button>
@@ -38,7 +38,7 @@
 			>
 				<div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
 					{#if title}
-						<h3 class="text-base font-semibold leading-6 text-gray-900">
+						<h3 class="text-base leading-6 font-semibold text-gray-900">
 							{title}
 						</h3>
 					{/if}

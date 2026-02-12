@@ -16,7 +16,7 @@
 
 	const deleteMessage = $derived(
 		projectToDelete
-			? `Are you sure you want to delete "${projectToDelete.name}"? This action cannot be undone.`
+			? `Are you sure you want to delete "${projectToDelete.eventName}"? This action cannot be undone.`
 			: ''
 	);
 

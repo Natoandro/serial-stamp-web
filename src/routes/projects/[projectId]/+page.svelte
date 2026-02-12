@@ -51,7 +51,7 @@
 						<IconArrowLeft />
 					</Button>
 					<h1 class="text-3xl font-bold tracking-tight text-gray-900">
-						{project?.name || 'Loading...'}
+						{project?.eventName || 'Loading...'}
 					</h1>
 				</div>
 				{#if project}

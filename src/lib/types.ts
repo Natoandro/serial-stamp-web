@@ -121,7 +121,9 @@ export interface SheetLayout {
 
 export interface Project {
 	id: string;
-	name: string;
+	eventName: string;
+	eventDate: string;
+	ticketType: string;
 	templateImage: Blob;
 	stamps: Stamp[];
 	dataSources: DataSource[];

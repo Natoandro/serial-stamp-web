@@ -1,0 +1,69 @@
+<script lang="ts">
+	import { cn } from '$lib/utils/cn';
+
+	interface Props {
+		id?: string;
+		value?: string;
+		min?: string;
+		max?: string;
+		required?: boolean;
+		disabled?: boolean;
+		class?: string;
+		label?: string;
+		hint?: string;
+		error?: string;
+	}
+
+	let {
+		id,
+		value = $bindable(''),
+		min,
+		max,
+		required = false,
+		disabled = false,
+		class: className = '',
+		label,
+		hint,
+		error,
+		...props
+	}: Props = $props();
+
+	const inputId = $derived(id || `date-input-${Math.random().toString(36).slice(2, 9)}`);
+	const hasError = $derived(!!error);
+</script>
+
+<div class={cn('space-y-1', className)}>
+	{#if label}
+		<label for={inputId} class="block text-sm font-medium text-gray-700">
+			{label}
+			{#if required}
+				<span class="text-red-500">*</span>
+			{/if}
+		</label>
+	{/if}
+
+	<input
+		type="date"
+		id={inputId}
+		bind:value
+		{min}
+		{max}
+		{required}
+		{disabled}
+		class={cn(
+			'block w-full rounded-md border px-3 py-2 shadow-sm transition-colors',
+			'focus:ring-1 focus:outline-none',
+			hasError
+				? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+				: 'border-gray-300 focus:border-blue-500 focus:ring-blue-500',
+			disabled && 'cursor-not-allowed bg-gray-50 text-gray-500'
+		)}
+		{...props}
+	/>
+
+	{#if error}
+		<p class="text-sm text-red-600">{error}</p>
+	{:else if hint}
+		<p class="text-sm text-gray-500">{hint}</p>
+	{/if}
+</div>

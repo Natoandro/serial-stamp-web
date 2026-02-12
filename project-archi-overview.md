@@ -8,7 +8,7 @@
   - Stamps:
     - text: with template variables (e.g., `{{number}}`) and styling options (font, size, color)
     - barcode/QR code: with data template variables and format options
-    Stamps will be positioned on the ticket using a drag-and-drop interface.
+      Stamps will be positioned on the ticket using a drag-and-drop interface.
 - After setting up a single ticket, users can choose to generate a grid of tickets on a sheet, specifying paper size, rows/columns and spacing (inner spacing and margin).
 - The final output will be a print-ready PDF.
 - When focusing on single tickets, the UI will always show a preview of the ticket rendered in a canvas.

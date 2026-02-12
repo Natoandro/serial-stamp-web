@@ -40,12 +40,13 @@
 	<div class="aspect-4/3 bg-gray-100">
 		<img
 			src={getThumbnailUrl(project.templateImage)}
-			alt={project.name}
+			alt={project.eventName}
 			class="h-full w-full object-contain"
 		/>
 	</div>
 	<div class="flex flex-1 flex-col p-4">
-		<h3 class="text-lg font-semibold text-gray-900">{project.name}</h3>
+		<h3 class="text-lg font-semibold text-gray-900">{project.eventName}</h3>
+		<p class="text-sm text-gray-600">{project.ticketType}</p>
 		<div class="mt-2 flex items-center gap-4 text-sm text-gray-500">
 			<div class="flex items-center gap-1">
 				<IconTag />

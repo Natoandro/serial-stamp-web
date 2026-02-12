@@ -75,7 +75,7 @@
 			<div class="rounded-lg border border-gray-200 bg-white p-8 text-center">
 				<p class="text-gray-500">Sheet layout editor coming soon (Phase 5)</p>
 				<div class="mt-4 text-sm text-gray-400">
-					<p>Project: {project?.name}</p>
+					<p>Project: {project?.eventName}</p>
 				</div>
 			</div>
 		{/if}

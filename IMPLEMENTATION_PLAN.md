@@ -26,6 +26,7 @@ Create `src/lib/types.ts` with the core data model:
 #### Core Types
 
 **Project**
+
 - `id: string` (UUID)
 - `name: string`
 - `templateImage: Blob`
@@ -36,6 +37,7 @@ Create `src/lib/types.ts` with the core data model:
 - `updatedAt: Date`
 
 **Stamp** (discriminated union)
+
 - `type: 'text' | 'barcode' | 'qrcode'`
 - `id: string` (UUID)
 - `x: number` (position in template image pixels)
@@ -44,6 +46,7 @@ Create `src/lib/types.ts` with the core data model:
 - `height: number`
 
 **TextStamp** extends `Stamp`
+
 - `type: 'text'`
 - `template: string` (e.g., `"{{number}}"`)
 - `fontFamily: string`
@@ -52,26 +55,31 @@ Create `src/lib/types.ts` with the core data model:
 - `alignment: 'left' | 'center' | 'right'`
 
 **BarcodeStamp** extends `Stamp`
+
 - `type: 'barcode'`
 - `template: string`
 - `format: BarcodeFormat` (Code128, Code39, EAN-13, etc.)
 
 **QrCodeStamp** extends `Stamp`
+
 - `type: 'qrcode'`
 - `template: string`
 - `errorCorrection: 'L' | 'M' | 'Q' | 'H'`
 - `moduleSize: number`
 
 **DataSource** (discriminated union)
+
 - `type: 'csv' | 'sequential' | 'random'`
 - `id: string` (UUID)
 
 **CsvDataSource** extends `DataSource`
+
 - `type: 'csv'`
 - `columns: string[]`
 - `rows: Record<string, string>[]`
 
 **SequentialDataSource** extends `DataSource`
+
 - `type: 'sequential'`
 - `prefix?: string`
 - `start: number`
@@ -80,12 +88,14 @@ Create `src/lib/types.ts` with the core data model:
 - `padLength: number`
 
 **RandomDataSource** extends `DataSource`
+
 - `type: 'random'`
 - `charset: string`
 - `length: number`
 - `count: number`
 
 **SheetLayout**
+
 - `paperSize: PaperSize`
 - `rows: number`
 - `cols: number`
@@ -97,6 +107,7 @@ Create `src/lib/types.ts` with the core data model:
 - `spacingY: number` (mm)
 
 **PaperSize**
+
 - `name: string` (e.g., "A4", "Letter", "Custom")
 - `widthMm: number`
 - `heightMm: number`
@@ -112,14 +123,14 @@ import Dexie, { type Table } from 'dexie';
 import type { Project } from './types';
 
 export class SerialStampDatabase extends Dexie {
-  projects!: Table<Project, string>;
+	projects!: Table<Project, string>;
 
-  constructor() {
-    super('SerialStampDB');
-    this.version(1).stores({
-      projects: 'id, createdAt'
-    });
-  }
+	constructor() {
+		super('SerialStampDB');
+		this.version(1).stores({
+			projects: 'id, createdAt'
+		});
+	}
 }
 
 export const db = new SerialStampDatabase();
@@ -139,36 +150,36 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Project } from '$lib/types';
 
 export async function createProject(
-  data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>
+	data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<Project> {
-  const now = new Date();
-  const project: Project = {
-    ...data,
-    id: uuidv4(),
-    createdAt: now,
-    updatedAt: now
-  };
-  await db.projects.add(project);
-  return project;
+	const now = new Date();
+	const project: Project = {
+		...data,
+		id: uuidv4(),
+		createdAt: now,
+		updatedAt: now
+	};
+	await db.projects.add(project);
+	return project;
 }
 
 export async function getProject(id: string): Promise<Project | undefined> {
-  return await db.projects.get(id);
+	return await db.projects.get(id);
 }
 
 export async function listProjects(): Promise<Project[]> {
-  return await db.projects.orderBy('createdAt').reverse().toArray();
+	return await db.projects.orderBy('createdAt').reverse().toArray();
 }
 
 export async function updateProject(
-  id: string,
-  patch: Partial<Omit<Project, 'id' | 'createdAt'>>
+	id: string,
+	patch: Partial<Omit<Project, 'id' | 'createdAt'>>
 ): Promise<void> {
-  await db.projects.update(id, { ...patch, updatedAt: new Date() });
+	await db.projects.update(id, { ...patch, updatedAt: new Date() });
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  await db.projects.delete(id);
+	await db.projects.delete(id);
 }
 ```
 
@@ -197,6 +208,7 @@ src/routes/
 `src/routes/+page.svelte`:
 
 **Features**:
+
 - Grid/list of existing projects.
 - Display: project name, thumbnail (rendered from template image), created date.
 - "New Project" button → navigates to `/projects/new`.
@@ -204,6 +216,7 @@ src/routes/
 - Delete button with confirmation dialog.
 
 **Implementation**:
+
 - On mount, call `listProjects()`.
 - Store in component state using `$state`.
 - Render thumbnails using `<img>` with blob URLs from `templateImage`.
@@ -219,13 +232,16 @@ src/routes/
 Create `src/lib/components/wizard/Wizard.svelte`:
 
 **Props**:
+
 - `steps: { label: string, component: ComponentType, validate?: () => boolean }[]`
 
 **State**:
+
 - `currentStep: number` (using `$state`)
 - `formData: Record<string, any>` (shared across steps)
 
 **UI**:
+
 - Step indicator (stepper/breadcrumb bar).
 - Next/Back/Finish buttons.
 - Validate current step before allowing forward navigation.
@@ -236,17 +252,21 @@ Create `src/lib/components/wizard/Wizard.svelte`:
 `src/lib/components/wizard/StepNameAndImage.svelte`:
 
 **Inputs**:
+
 - Text input for project name (required).
 - File input for template image (accept `image/*`, required).
 
 **Preview**:
+
 - Display uploaded image preview using `<img>`.
 
 **Validation**:
+
 - Name must not be empty.
 - Image file must be selected.
 
 **Output**:
+
 - `{ name: string, templateImage: Blob }`
 
 ### 1.3 — Step 2: Data Sources
@@ -254,16 +274,19 @@ Create `src/lib/components/wizard/Wizard.svelte`:
 `src/lib/components/wizard/StepDataSources.svelte`:
 
 **UI**:
+
 - Tabs or radio buttons to select data source type (CSV / Sequential / Random).
 - Allow adding multiple data sources (optional, start with single source).
 
 **CSV Source**:
+
 - File upload (accept `.csv`).
 - Parse with PapaParse (install in Phase 4).
 - Show preview table.
 - Extract column names as available template variables.
 
 **Sequential Source**:
+
 - Inputs:
   - Start number (default: 1)
   - End number (required)
@@ -272,15 +295,18 @@ Create `src/lib/components/wizard/Wizard.svelte`:
   - Prefix (optional, e.g., `"TICKET-"`)
 
 **Random Source**:
+
 - Inputs:
   - Charset (dropdown: alphanumeric, numeric, alpha, custom)
   - Length (default: 8)
   - Count (number of random strings to generate)
 
 **Validation**:
+
 - At least one data source must be configured.
 
 **Output**:
+
 - `{ dataSources: DataSource[] }`
 
 ### 1.4 — Step 3: Stamps (Simplified Editor)
@@ -288,24 +314,29 @@ Create `src/lib/components/wizard/Wizard.svelte`:
 `src/lib/components/wizard/StepStamps.svelte`:
 
 **UI**:
+
 - "Add Stamp" button (dropdown: Text / Barcode / QR Code).
 - List of added stamps (name, type, position).
 - Side panel for editing selected stamp.
 - Canvas preview of ticket with stamps overlaid (see Phase 2 for rendering).
 
 **Drag-and-Drop**:
+
 - Use Phase 2's canvas interaction for positioning.
 - Allow basic resize handles.
 
 **Validation**:
+
 - No validation required (stamps are optional).
 
 **Output**:
+
 - `{ stamps: Stamp[] }`
 
 ### 1.5 — Wizard Completion
 
 On "Finish":
+
 1. Assemble full `Project` object from wizard `formData`.
 2. Call `createProject()` to persist to IndexedDB.
 3. Navigate to `/projects/[projectId]`.
@@ -323,9 +354,11 @@ Create `src/lib/canvas/TicketRenderer.ts`:
 **Class**: `TicketRenderer`
 
 **Constructor**:
+
 - Accepts `CanvasRenderingContext2D`, template image (`ImageBitmap`), stamps, DPI scale factor.
 
 **Methods**:
+
 - `render(record: Record<string, string>): void`
   - Clear canvas.
   - Draw template image.
@@ -336,6 +369,7 @@ Create `src/lib/canvas/TicketRenderer.ts`:
 - `getImageData(): ImageData` — returns rendered pixels for PDF export.
 
 **Template Variable Resolution**:
+
 - Replace `{{key}}` in stamp templates with `record[key]`.
 - Fallback to empty string for missing keys.
 
@@ -344,11 +378,13 @@ Create `src/lib/canvas/TicketRenderer.ts`:
 Create `src/lib/components/editor/TicketPreview.svelte`:
 
 **Props**:
+
 - `project: Project`
 - `selectedRecord: Record<string, string>` (current data record to preview)
 - `selectedStampId?: string` (highlight selected stamp)
 
 **Features**:
+
 - `<canvas>` element bound via `bind:this`.
 - Re-render on changes to stamps, template image, or selected record (use `$effect`).
 - Handle canvas sizing and DPI scaling for crisp display.
@@ -359,6 +395,7 @@ Create `src/lib/components/editor/TicketPreview.svelte`:
 Create `src/lib/components/editor/StampPanel.svelte`:
 
 **UI**:
+
 - List all stamps with:
   - Type icon (text/barcode/QR).
   - Preview of rendered stamp (small thumbnail).
@@ -367,6 +404,7 @@ Create `src/lib/components/editor/StampPanel.svelte`:
 - "Add Stamp" button (dropdown menu).
 
 **State**:
+
 - Selected stamp ID (using `$state`).
 
 ### 2.4 — Stamp Property Editors
@@ -376,6 +414,7 @@ Create per-type stamp editors:
 #### `src/lib/components/editor/TextStampEditor.svelte`
 
 **Inputs**:
+
 - Template text (textarea with variable picker).
 - Font family (dropdown: web-safe fonts like Arial, Helvetica, Times New Roman, Courier).
 - Font size (number input, px or pt).
@@ -385,12 +424,14 @@ Create per-type stamp editors:
 #### `src/lib/components/editor/BarcodeStampEditor.svelte`
 
 **Inputs**:
+
 - Data template (text input with variable picker).
 - Barcode format (dropdown: Code128, Code39, EAN-13, UPC-A, etc.).
 
 #### `src/lib/components/editor/QrCodeStampEditor.svelte`
 
 **Inputs**:
+
 - Data template (text input with variable picker).
 - Error correction level (dropdown: L, M, Q, H).
 - Module size (number input, px).
@@ -400,16 +441,19 @@ Create per-type stamp editors:
 **Location**: Add to `TicketPreview.svelte` or create `src/lib/canvas/interaction.ts`.
 
 **Features**:
+
 - Mouse/touch event handlers on canvas:
   - **Click**: select stamp (show bounding box + resize handles).
   - **Drag**: move stamp position (`x`, `y`).
   - **Resize handles**: change stamp `width`/`height`.
 
 **Coordinate System**:
+
 - Store positions in **template image pixels** (not screen pixels).
 - Convert between screen coordinates and image coordinates based on canvas display scale.
 
 **Persistence**:
+
 - Update stamp positions in component state (`$state`).
 - Debounce saves to IndexedDB (e.g., 500ms after last change).
 
@@ -418,30 +462,27 @@ Create per-type stamp editors:
 Create `src/lib/engine/template.ts`:
 
 ```typescript
-export function resolveTemplate(
-  template: string,
-  record: Record<string, string>
-): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => record[key] || '');
+export function resolveTemplate(template: string, record: Record<string, string>): string {
+	return template.replace(/\{\{(\w+)\}\}/g, (_, key) => record[key] || '');
 }
 
 export function extractVariables(template: string): string[] {
-  const matches = template.matchAll(/\{\{(\w+)\}\}/g);
-  return Array.from(matches, m => m[1]);
+	const matches = template.matchAll(/\{\{(\w+)\}\}/g);
+	return Array.from(matches, (m) => m[1]);
 }
 
 export function getAvailableVariables(dataSources: DataSource[]): string[] {
-  const vars = new Set<string>();
-  for (const source of dataSources) {
-    if (source.type === 'csv') {
-      source.columns.forEach(col => vars.add(col));
-    } else if (source.type === 'sequential') {
-      vars.add('number');
-    } else if (source.type === 'random') {
-      vars.add('random');
-    }
-  }
-  return Array.from(vars);
+	const vars = new Set<string>();
+	for (const source of dataSources) {
+		if (source.type === 'csv') {
+			source.columns.forEach((col) => vars.add(col));
+		} else if (source.type === 'sequential') {
+			vars.add('number');
+		} else if (source.type === 'random') {
+			vars.add('random');
+		}
+	}
+	return Array.from(vars);
 }
 ```
 
@@ -468,32 +509,27 @@ Create `src/lib/engine/barcode.ts`:
 ```typescript
 import bwipjs from 'bwip-js';
 
-export type BarcodeFormat =
-  | 'code128'
-  | 'code39'
-  | 'ean13'
-  | 'upca'
-  | 'qrcode';
+export type BarcodeFormat = 'code128' | 'code39' | 'ean13' | 'upca' | 'qrcode';
 
 export async function generateBarcode(
-  data: string,
-  format: BarcodeFormat,
-  width: number,
-  height: number
+	data: string,
+	format: BarcodeFormat,
+	width: number,
+	height: number
 ): Promise<ImageBitmap> {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+	const canvas = document.createElement('canvas');
+	canvas.width = width;
+	canvas.height = height;
 
-  bwipjs.toCanvas(canvas, {
-    bcid: format,
-    text: data,
-    width: width / 10,  // bwip-js uses mm
-    height: height / 10,
-    includetext: false,
-  });
+	bwipjs.toCanvas(canvas, {
+		bcid: format,
+		text: data,
+		width: width / 10, // bwip-js uses mm
+		height: height / 10,
+		includetext: false
+	});
 
-  return await createImageBitmap(canvas);
+	return await createImageBitmap(canvas);
 }
 ```
 
@@ -507,21 +543,18 @@ import QRCode from 'qrcode';
 export type QrErrorCorrection = 'L' | 'M' | 'Q' | 'H';
 
 export interface QrOptions {
-  errorCorrectionLevel: QrErrorCorrection;
-  width: number;
+	errorCorrectionLevel: QrErrorCorrection;
+	width: number;
 }
 
-export async function generateQrCode(
-  data: string,
-  options: QrOptions
-): Promise<ImageBitmap> {
-  const canvas = document.createElement('canvas');
-  await QRCode.toCanvas(canvas, data, {
-    errorCorrectionLevel: options.errorCorrectionLevel,
-    width: options.width,
-  });
+export async function generateQrCode(data: string, options: QrOptions): Promise<ImageBitmap> {
+	const canvas = document.createElement('canvas');
+	await QRCode.toCanvas(canvas, data, {
+		errorCorrectionLevel: options.errorCorrectionLevel,
+		width: options.width
+	});
 
-  return await createImageBitmap(canvas);
+	return await createImageBitmap(canvas);
 }
 ```
 
@@ -539,45 +572,45 @@ Create `src/lib/engine/datasource.ts`:
 import type { DataSource, CsvDataSource, SequentialDataSource, RandomDataSource } from '$lib/types';
 
 export function generateRecords(sources: DataSource[]): Record<string, string>[] {
-  if (sources.length === 0) return [{}];
+	if (sources.length === 0) return [{}];
 
-  // Start with single source support
-  const source = sources[0];
+	// Start with single source support
+	const source = sources[0];
 
-  switch (source.type) {
-    case 'csv':
-      return generateCsvRecords(source);
-    case 'sequential':
-      return generateSequentialRecords(source);
-    case 'random':
-      return generateRandomRecords(source);
-  }
+	switch (source.type) {
+		case 'csv':
+			return generateCsvRecords(source);
+		case 'sequential':
+			return generateSequentialRecords(source);
+		case 'random':
+			return generateRandomRecords(source);
+	}
 }
 
 function generateCsvRecords(source: CsvDataSource): Record<string, string>[] {
-  return source.rows;
+	return source.rows;
 }
 
 function generateSequentialRecords(source: SequentialDataSource): Record<string, string>[] {
-  const records: Record<string, string>[] = [];
-  for (let i = source.start; i <= source.end; i += source.step) {
-    const num = i.toString().padStart(source.padLength, '0');
-    const value = source.prefix ? `${source.prefix}${num}` : num;
-    records.push({ number: value });
-  }
-  return records;
+	const records: Record<string, string>[] = [];
+	for (let i = source.start; i <= source.end; i += source.step) {
+		const num = i.toString().padStart(source.padLength, '0');
+		const value = source.prefix ? `${source.prefix}${num}` : num;
+		records.push({ number: value });
+	}
+	return records;
 }
 
 function generateRandomRecords(source: RandomDataSource): Record<string, string>[] {
-  const records: Record<string, string>[] = [];
-  for (let i = 0; i < source.count; i++) {
-    let value = '';
-    for (let j = 0; j < source.length; j++) {
-      value += source.charset[Math.floor(Math.random() * source.charset.length)];
-    }
-    records.push({ random: value });
-  }
-  return records;
+	const records: Record<string, string>[] = [];
+	for (let i = 0; i < source.count; i++) {
+		let value = '';
+		for (let j = 0; j < source.length; j++) {
+			value += source.charset[Math.floor(Math.random() * source.charset.length)];
+		}
+		records.push({ random: value });
+	}
+	return records;
 }
 ```
 
@@ -598,24 +631,24 @@ import type { CsvDataSource } from '$lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function parseCsv(file: File): Promise<CsvDataSource> {
-  return new Promise((resolve, reject) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const rows = results.data as Record<string, string>[];
-        const columns = results.meta.fields || [];
+	return new Promise((resolve, reject) => {
+		Papa.parse(file, {
+			header: true,
+			skipEmptyLines: true,
+			complete: (results) => {
+				const rows = results.data as Record<string, string>[];
+				const columns = results.meta.fields || [];
 
-        resolve({
-          id: uuidv4(),
-          type: 'csv',
-          columns,
-          rows,
-        });
-      },
-      error: (error) => reject(error),
-    });
-  });
+				resolve({
+					id: uuidv4(),
+					type: 'csv',
+					columns,
+					rows
+				});
+			},
+			error: (error) => reject(error)
+		});
+	});
 }
 ```
 
@@ -630,12 +663,14 @@ export async function parseCsv(file: File): Promise<CsvDataSource> {
 `src/routes/projects/[projectId]/sheet/+page.svelte`:
 
 **Inputs**:
+
 - **Paper size selector**: Dropdown (A4, A3, Letter) + "Custom" with width/height inputs (mm).
 - **Grid configuration**: Rows (number), Columns (number).
 - **Margins**: Top, Right, Bottom, Left (mm).
 - **Spacing**: Inner spacing X (horizontal gap), Y (vertical gap) between tickets (mm).
 
 **Validation & Preview**:
+
 - Calculate whether tickets fit:
   ```
   ticketWidth = (paperWidth - marginLeft - marginRight - (cols - 1) * spacingX) / cols
@@ -645,6 +680,7 @@ export async function parseCsv(file: File): Promise<CsvDataSource> {
 - Display calculated ticket dimensions.
 
 **Save**:
+
 - Update `project.sheetLayout` in IndexedDB.
 
 ### 5.2 — Sheet Preview Canvas
@@ -652,6 +688,7 @@ export async function parseCsv(file: File): Promise<CsvDataSource> {
 Create `src/lib/components/editor/SheetPreview.svelte`:
 
 **Features**:
+
 - Render full sheet at scaled-down size (fit to screen).
 - Draw:
   1. Paper outline (border).
@@ -660,11 +697,13 @@ Create `src/lib/components/editor/SheetPreview.svelte`:
   4. Spacing between tickets (visual guides/grid lines).
 
 **Data Mapping**:
+
 - Map data records to cells sequentially (left-to-right, top-to-bottom).
 - Total tickets per sheet: `rows * cols`.
 - If `records.length > rows * cols`, support multi-page preview (pagination controls).
 
 **Zoom/Pan** (optional):
+
 - Allow zooming in/out and panning for large sheets.
 
 ### 5.3 — Sheet Data Mapping
@@ -673,30 +712,30 @@ Create `src/lib/canvas/SheetRenderer.ts`:
 
 ```typescript
 export class SheetRenderer {
-  constructor(
-    private ctx: CanvasRenderingContext2D,
-    private sheetLayout: SheetLayout,
-    private ticketRenderer: TicketRenderer,
-    private records: Record<string, string>[]
-  ) {}
+	constructor(
+		private ctx: CanvasRenderingContext2D,
+		private sheetLayout: SheetLayout,
+		private ticketRenderer: TicketRenderer,
+		private records: Record<string, string>[]
+	) {}
 
-  render(pageIndex: number = 0): void {
-    const { rows, cols } = this.sheetLayout;
-    const ticketsPerPage = rows * cols;
-    const startIdx = pageIndex * ticketsPerPage;
+	render(pageIndex: number = 0): void {
+		const { rows, cols } = this.sheetLayout;
+		const ticketsPerPage = rows * cols;
+		const startIdx = pageIndex * ticketsPerPage;
 
-    // Clear canvas and draw paper background
-    // Draw margin guides
-    // For each cell (row, col):
-    //   - Calculate position (x, y) in mm → pixels
-    //   - Get corresponding record: records[startIdx + row * cols + col]
-    //   - Render ticket at position using ticketRenderer
-  }
+		// Clear canvas and draw paper background
+		// Draw margin guides
+		// For each cell (row, col):
+		//   - Calculate position (x, y) in mm → pixels
+		//   - Get corresponding record: records[startIdx + row * cols + col]
+		//   - Render ticket at position using ticketRenderer
+	}
 
-  getTotalPages(): number {
-    const ticketsPerPage = this.sheetLayout.rows * this.sheetLayout.cols;
-    return Math.ceil(this.records.length / ticketsPerPage);
-  }
+	getTotalPages(): number {
+		const ticketsPerPage = this.sheetLayout.rows * this.sheetLayout.cols;
+		return Math.ceil(this.records.length / ticketsPerPage);
+	}
 }
 ```
 
@@ -802,6 +841,7 @@ pub fn generate_pdf(
 ```
 
 **Notes**:
+
 - Handle DPI scaling: pixels → mm conversion based on target DPI (e.g., 300 DPI).
 - Image data format: assume raw RGBA bytes, convert to printpdf's image format.
 
@@ -811,9 +851,9 @@ Add build script to `package.json`:
 
 ```json
 {
-  "scripts": {
-    "build:wasm": "cd crates/pdf-gen && wasm-pack build --target web --out-dir ../../src/lib/wasm/pdf-gen"
-  }
+	"scripts": {
+		"build:wasm": "cd crates/pdf-gen && wasm-pack build --target web --out-dir ../../src/lib/wasm/pdf-gen"
+	}
 }
 ```
 
@@ -831,60 +871,60 @@ import { TicketRenderer } from '$lib/canvas/TicketRenderer';
 import type { Project } from '$lib/types';
 
 export async function exportPdf(project: Project, dpi: number = 300): Promise<Blob> {
-  // 1. Load WASM module
-  const { generate_pdf } = await import('$lib/wasm/pdf-gen/pdf_gen');
+	// 1. Load WASM module
+	const { generate_pdf } = await import('$lib/wasm/pdf-gen/pdf_gen');
 
-  // 2. Generate all data records
-  const records = generateRecords(project.dataSources);
+	// 2. Generate all data records
+	const records = generateRecords(project.dataSources);
 
-  // 3. Render each ticket to offscreen canvas at target DPI
-  const ticketImages: Uint8Array[] = [];
-  const templateImage = await createImageBitmap(project.templateImage);
-  
-  const offscreen = new OffscreenCanvas(ticketWidth, ticketHeight);
-  const ctx = offscreen.getContext('2d')!;
-  const renderer = new TicketRenderer(ctx, templateImage, project.stamps, dpi / 96);
+	// 3. Render each ticket to offscreen canvas at target DPI
+	const ticketImages: Uint8Array[] = [];
+	const templateImage = await createImageBitmap(project.templateImage);
 
-  for (const record of records) {
-    renderer.render(record);
-    const imageData = ctx.getImageData(0, 0, ticketWidth, ticketHeight);
-    ticketImages.push(new Uint8Array(imageData.data.buffer));
-  }
+	const offscreen = new OffscreenCanvas(ticketWidth, ticketHeight);
+	const ctx = offscreen.getContext('2d')!;
+	const renderer = new TicketRenderer(ctx, templateImage, project.stamps, dpi / 96);
 
-  // 4. Concatenate ticket images
-  const totalBytes = ticketImages.reduce((sum, img) => sum + img.length, 0);
-  const concatenated = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const img of ticketImages) {
-    concatenated.set(img, offset);
-    offset += img.length;
-  }
+	for (const record of records) {
+		renderer.render(record);
+		const imageData = ctx.getImageData(0, 0, ticketWidth, ticketHeight);
+		ticketImages.push(new Uint8Array(imageData.data.buffer));
+	}
 
-  // 5. Call WASM function
-  const config = JSON.stringify({
-    paper_width_mm: project.sheetLayout!.paperSize.widthMm,
-    paper_height_mm: project.sheetLayout!.paperSize.heightMm,
-    rows: project.sheetLayout!.rows,
-    cols: project.sheetLayout!.cols,
-    margin_top_mm: project.sheetLayout!.marginTop,
-    margin_right_mm: project.sheetLayout!.marginRight,
-    margin_bottom_mm: project.sheetLayout!.marginBottom,
-    margin_left_mm: project.sheetLayout!.marginLeft,
-    spacing_x_mm: project.sheetLayout!.spacingX,
-    spacing_y_mm: project.sheetLayout!.spacingY,
-  });
+	// 4. Concatenate ticket images
+	const totalBytes = ticketImages.reduce((sum, img) => sum + img.length, 0);
+	const concatenated = new Uint8Array(totalBytes);
+	let offset = 0;
+	for (const img of ticketImages) {
+		concatenated.set(img, offset);
+		offset += img.length;
+	}
 
-  const pdfBytes = generate_pdf(
-    config,
-    concatenated,
-    ticketWidth,
-    ticketHeight,
-    records.length,
-    dpi
-  );
+	// 5. Call WASM function
+	const config = JSON.stringify({
+		paper_width_mm: project.sheetLayout!.paperSize.widthMm,
+		paper_height_mm: project.sheetLayout!.paperSize.heightMm,
+		rows: project.sheetLayout!.rows,
+		cols: project.sheetLayout!.cols,
+		margin_top_mm: project.sheetLayout!.marginTop,
+		margin_right_mm: project.sheetLayout!.marginRight,
+		margin_bottom_mm: project.sheetLayout!.marginBottom,
+		margin_left_mm: project.sheetLayout!.marginLeft,
+		spacing_x_mm: project.sheetLayout!.spacingX,
+		spacing_y_mm: project.sheetLayout!.spacingY
+	});
 
-  // 6. Return as Blob
-  return new Blob([pdfBytes], { type: 'application/pdf' });
+	const pdfBytes = generate_pdf(
+		config,
+		concatenated,
+		ticketWidth,
+		ticketHeight,
+		records.length,
+		dpi
+	);
+
+	// 6. Return as Blob
+	return new Blob([pdfBytes], { type: 'application/pdf' });
 }
 ```
 
@@ -893,11 +933,13 @@ export async function exportPdf(project: Project, dpi: number = 300): Promise<Bl
 `src/lib/components/editor/ExportButton.svelte`:
 
 **Features**:
+
 - DPI selector (150 / 300 / 600).
 - Progress indicator (rendering X of N tickets…).
 - Trigger download on completion.
 
 **Implementation**:
+
 - Call `exportPdf()`.
 - Use `URL.createObjectURL()` to trigger download.
 - Optionally use Web Worker to avoid blocking UI during rendering.
@@ -927,6 +969,7 @@ export async function exportPdf(project: Project, dpi: number = 300): Promise<Bl
 ### 7.3 — Undo/Redo (Stretch Goal)
 
 **Implementation**:
+
 - Maintain a command stack (array of state snapshots or deltas).
 - Keyboard shortcuts: `Ctrl+Z` (undo), `Ctrl+Shift+Z` (redo).
 - Limit stack size (e.g., last 50 actions).
@@ -934,11 +977,13 @@ export async function exportPdf(project: Project, dpi: number = 300): Promise<Bl
 ### 7.4 — Project Import/Export (Stretch Goal)
 
 **Export**:
+
 - Serialize project to JSON.
 - Encode `templateImage` as base64.
 - Trigger download as `.json` file.
 
 **Import**:
+
 - File upload (accept `.json`).
 - Parse and validate schema.
 - Decode base64 image, create new project in IndexedDB.
@@ -947,15 +992,15 @@ export async function exportPdf(project: Project, dpi: number = 300): Promise<Bl
 
 ## Dependency Summary
 
-| Package | Purpose | Phase |
-|---------|---------|-------|
-| `dexie` | IndexedDB wrapper | 0 |
-| `uuid` | UUID generation | 0 |
-| `papaparse` | CSV parsing | 4 |
-| `bwip-js` | Barcode generation | 3 |
-| `qrcode` | QR code generation | 3 |
-| `wasm-pack` (build tool) | Compile Rust → WASM | 6 |
-| `printpdf` (Rust crate) | PDF generation | 6 |
+| Package                  | Purpose             | Phase |
+| ------------------------ | ------------------- | ----- |
+| `dexie`                  | IndexedDB wrapper   | 0     |
+| `uuid`                   | UUID generation     | 0     |
+| `papaparse`              | CSV parsing         | 4     |
+| `bwip-js`                | Barcode generation  | 3     |
+| `qrcode`                 | QR code generation  | 3     |
+| `wasm-pack` (build tool) | Compile Rust → WASM | 6     |
+| `printpdf` (Rust crate)  | PDF generation      | 6     |
 
 ---
 
@@ -1028,18 +1073,18 @@ serial-stamp/
 
 ## Recommended Implementation Order
 
-| Order | Phase | Estimated Effort | Deliverable |
-|-------|-------|------------------|-------------|
-| 1 | **Phase 0** | ~1 day | Types, DB, routing, project list page |
-| 2 | **Phase 1 (Steps 1-2)** | ~1 day | Wizard: name, image, data sources |
-| 3 | **Phase 2.1-2.3** | ~2 days | Canvas rendering + text stamps |
-| 4 | **Phase 2.5** | ~1 day | Drag-and-drop positioning |
-| 5 | **Phase 4** | ~1 day | Data source engine, record generation |
-| 6 | **Phase 3** | ~1 day | Barcode & QR code generation |
-| 7 | **Phase 1.4** | ~0.5 day | Wizard: stamp setup (Step 3) |
-| 8 | **Phase 5** | ~1.5 days | Sheet layout editor + preview |
-| 9 | **Phase 6** | ~2-3 days | Rust/WASM PDF export |
-| 10 | **Phase 7** | Ongoing | Validation, error handling, polish |
+| Order | Phase                   | Estimated Effort | Deliverable                           |
+| ----- | ----------------------- | ---------------- | ------------------------------------- |
+| 1     | **Phase 0**             | ~1 day           | Types, DB, routing, project list page |
+| 2     | **Phase 1 (Steps 1-2)** | ~1 day           | Wizard: name, image, data sources     |
+| 3     | **Phase 2.1-2.3**       | ~2 days          | Canvas rendering + text stamps        |
+| 4     | **Phase 2.5**           | ~1 day           | Drag-and-drop positioning             |
+| 5     | **Phase 4**             | ~1 day           | Data source engine, record generation |
+| 6     | **Phase 3**             | ~1 day           | Barcode & QR code generation          |
+| 7     | **Phase 1.4**           | ~0.5 day         | Wizard: stamp setup (Step 3)          |
+| 8     | **Phase 5**             | ~1.5 days        | Sheet layout editor + preview         |
+| 9     | **Phase 6**             | ~2-3 days        | Rust/WASM PDF export                  |
+| 10    | **Phase 7**             | Ongoing          | Validation, error handling, polish    |
 
 **Total estimate**: ~11-13 working days for a functional MVP.
 

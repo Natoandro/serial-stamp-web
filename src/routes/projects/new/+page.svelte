@@ -28,7 +28,9 @@
 		const templateImageBlob = formData.templateImageFile as Blob;
 
 		const project = await createProject({
-			name: formData.name as string,
+			eventName: formData.eventName as string,
+			eventDate: formData.eventDate as string,
+			ticketType: formData.ticketType as string,
 			templateImage: templateImageBlob,
 			dataSources: (formData.dataSources || []) as DataSource[],
 			stamps: (formData.stamps || []) as Stamp[]

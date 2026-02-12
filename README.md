@@ -3,6 +3,7 @@
 Serial Stamp is a web app for adding “stamps” onto an image — e.g. ticket numbering, barcodes, QR codes, labels, and other repeated overlays.
 
 A common workflow is:
+
 - Start from a large “sheet” image intended for printing
 - Place stamps at precise positions (often as a grid)
 - Generate many unique tickets on one sheet
