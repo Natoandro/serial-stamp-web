@@ -59,11 +59,13 @@
 	}
 
 	async function goNext() {
-		if (isLastStep && onFinish && canProceed) {
-			// Last step - execute the finish callback
+		if (!canProceed) return;
+
+		// Execute the step's custom handler if provided
+		if (onFinish) {
 			await onFinish();
-		} else if (!isLastStep && canProceed) {
-			// Navigate to next step
+		} else if (!isLastStep) {
+			// No custom handler - just navigate to next step
 			void goto(steps[currentStepIndex + 1].path);
 		}
 	}
