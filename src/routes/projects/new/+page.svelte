@@ -1,20 +1,46 @@
 <script lang="ts">
-	import Button from '$lib/components/ui/Button.svelte';
+	import { goto } from '$app/navigation';
+	import Wizard from '$lib/components/wizard/Wizard.svelte';
+	import StepNameAndImage from '$lib/components/wizard/StepNameAndImage.svelte';
+	import StepDataSources from '$lib/components/wizard/StepDataSources.svelte';
+	import StepStamps from '$lib/components/wizard/StepStamps.svelte';
+	import { createProject } from '$lib/data/projects';
+	import type { DataSource, Stamp } from '$lib/types';
+	import type { Component } from 'svelte';
+
+	const steps: Array<{ label: string; component: Component }> = [
+		{
+			label: 'Project Info',
+			component: StepNameAndImage as unknown as Component
+		},
+		{
+			label: 'Data Sources',
+			component: StepDataSources as unknown as Component
+		},
+		{
+			label: 'Stamps',
+			component: StepStamps as unknown as Component
+		}
+	];
+
+	async function handleComplete(formData: Record<string, unknown>) {
+		// Convert File to Blob for storage
+		const templateImageBlob = formData.templateImageFile as Blob;
+
+		const project = await createProject({
+			name: formData.name as string,
+			templateImage: templateImageBlob,
+			dataSources: (formData.dataSources || []) as DataSource[],
+			stamps: (formData.stamps || []) as Stamp[]
+		});
+
+		// Navigate to the project editor
+		void goto(`/projects/${project.id}`);
+	}
+
+	function handleCancel() {
+		void goto('/');
+	}
 </script>
 
-<div class="min-h-screen bg-gray-50">
-	<header class="bg-white shadow-sm">
-		<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-			<div class="flex items-center justify-between">
-				<h1 class="text-3xl font-bold tracking-tight text-gray-900">New Project</h1>
-				<Button href="/" variant="secondary">Cancel</Button>
-			</div>
-		</div>
-	</header>
-
-	<main class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-		<div class="rounded-lg border border-gray-200 bg-white p-8 text-center">
-			<p class="text-gray-500">Project wizard coming soon (Phase 1)</p>
-		</div>
-	</main>
-</div>
+<Wizard {steps} onComplete={handleComplete} onCancel={handleCancel} />
