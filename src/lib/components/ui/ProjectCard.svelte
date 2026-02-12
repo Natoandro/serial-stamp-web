@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
 	import IconTag from '$lib/components/icons/IconTag.svelte';
 	import IconDocument from '$lib/components/icons/IconDocument.svelte';
 	import IconTrash from '$lib/components/icons/IconTrash.svelte';
@@ -16,12 +15,6 @@
 	let thumbnailUrl = $state<string>('');
 
 	$effect(() => {
-		// Clean up previous URL if it exists
-		if (thumbnailUrl) {
-			URL.revokeObjectURL(thumbnailUrl);
-			thumbnailUrl = '';
-		}
-
 		// Create new URL if we have a valid Blob
 		if (
 			project.templateImage &&
@@ -34,13 +27,16 @@
 				console.error('Failed to create thumbnail URL:', error);
 				thumbnailUrl = '';
 			}
+		} else {
+			thumbnailUrl = '';
 		}
-	});
 
-	onDestroy(() => {
-		if (thumbnailUrl) {
-			URL.revokeObjectURL(thumbnailUrl);
-		}
+		// Return cleanup function
+		return () => {
+			if (thumbnailUrl) {
+				URL.revokeObjectURL(thumbnailUrl);
+			}
+		};
 	});
 
 	function formatDate(date: Date): string {
