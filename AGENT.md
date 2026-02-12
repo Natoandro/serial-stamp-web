@@ -27,7 +27,7 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 ## 3) Tasks/scripts discipline
 
 - Before running any task/script, check `package.json` for available scripts.
-- Do not assume script names or package managers; follow what the repo uses.
+- Always use `pnpm` as the package manager (never `npm` or `yarn`).
 - When proposing commands, use the scripts defined in `package.json`.
 
 ## 4) Project: Serial Stamp

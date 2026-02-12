@@ -5,16 +5,17 @@
 	import { isValidUUID } from '$lib/utils/uuid';
 	import type { WizardState } from '$lib/stores/wizard.svelte';
 	import { wizardState } from '$lib/stores/wizard.svelte';
-	import { getProject } from '$lib/data/projects';
+	import { useProjectQuery } from '$lib/queries/projects.svelte';
 
 	const canProceedContext = getContext<{ value: boolean }>('canProceed');
 
-	const projectIdParam = $page.url.searchParams.get('projectId');
+	const projectIdParam = page.url.searchParams.get('projectId');
 	let projectId = $state<string | null>(
 		projectIdParam && isValidUUID(projectIdParam) ? projectIdParam : null
 	);
 	let isNavigating = $state(false);
-	let isLoading = $state(false);
+
+	const projectQuery = $derived(useProjectQuery(projectId));
 
 	onMount(async () => {
 		if (!projectId) {
@@ -22,26 +23,20 @@
 			await goto('/projects/new/event-info');
 			return;
 		}
+	});
 
-		isLoading = true;
-		try {
-			const project = await getProject(projectId);
-			if (project) {
-				wizardState.loadFromProject(project);
-			} else {
-				// Project not found - redirect to step 1
-				await goto('/projects/new/event-info');
-			}
-		} catch (error) {
-			console.error('Failed to load project:', error);
-			await goto('/projects/new/event-info');
-		} finally {
-			isLoading = false;
+	// Load project data into wizard state when query succeeds
+	$effect(() => {
+		if (projectQuery.data) {
+			wizardState.loadFromProject(projectQuery.data);
+		} else if (projectQuery.isError) {
+			// Project not found - redirect to step 1
+			void goto('/projects/new/event-info');
 		}
 	});
 
 	$effect(() => {
-		canProceedContext.value = projectId !== null && !isNavigating && !isLoading;
+		canProceedContext.value = projectId !== null && !isNavigating && !projectQuery.isLoading;
 	});
 
 	const onFinishContext = getContext<{ value: (() => void | Promise<void>) | null }>('onFinish');
@@ -71,7 +66,7 @@
 	}
 </script>
 
-{#if isLoading}
+{#if projectQuery.isLoading}
 	<div class="flex items-center justify-center rounded-lg border border-gray-200 bg-white p-8">
 		<div class="text-center">
 			<div

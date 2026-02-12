@@ -43,7 +43,7 @@
 		{ path: '/projects/new/stamps', label: 'Stamps' }
 	];
 
-	let currentStepIndex = $derived(steps.findIndex((step) => $page.url.pathname === step.path));
+	let currentStepIndex = $derived(steps.findIndex((step) => page.url.pathname === step.path));
 	let isFirstStep = $derived(currentStepIndex === 0);
 	let isLastStep = $derived(currentStepIndex === steps.length - 1);
 

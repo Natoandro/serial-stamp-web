@@ -5,7 +5,7 @@
 	import { isValidUUID } from '$lib/utils/uuid';
 	import { v4 as uuidv4 } from 'uuid';
 	import type { WizardState } from '$lib/stores/wizard.svelte';
-	import { updateProject, getProject } from '$lib/data/projects';
+	import { useProjectQuery, useUpdateProjectMutation } from '$lib/queries/projects.svelte';
 	import DataSourceList from '$lib/components/wizard/data-sources/DataSourceList.svelte';
 	import SequentialSourceForm from '$lib/components/wizard/data-sources/SequentialSourceForm.svelte';
 	import RandomSourceForm from '$lib/components/wizard/data-sources/RandomSourceForm.svelte';
@@ -17,12 +17,14 @@
 
 	let selectedType = $state<'sequential' | 'random' | 'csv'>('sequential');
 
-	const projectIdParam = $page.url.searchParams.get('projectId');
+	const projectIdParam = page.url.searchParams.get('projectId');
 	let projectId = $state<string | null>(
 		projectIdParam && isValidUUID(projectIdParam) ? projectIdParam : null
 	);
 	let isNavigating = $state(false);
-	let isLoading = $state(false);
+
+	const projectQuery = $derived(useProjectQuery(projectId));
+	const updateMutation = useUpdateProjectMutation();
 
 	onMount(async () => {
 		if (!projectId) {
@@ -30,27 +32,21 @@
 			await goto('/projects/new/event-info');
 			return;
 		}
+	});
 
-		isLoading = true;
-		try {
-			const project = await getProject(projectId);
-			if (project) {
-				wizardState.loadFromProject(project);
-			} else {
-				// Project not found - redirect to step 1
-				await goto('/projects/new/event-info');
-			}
-		} catch (error) {
-			console.error('Failed to load project:', error);
-			await goto('/projects/new/event-info');
-		} finally {
-			isLoading = false;
+	// Load project data into wizard state when query succeeds
+	$effect(() => {
+		if (projectQuery.data) {
+			wizardState.loadFromProject(projectQuery.data);
+		} else if (projectQuery.isError) {
+			// Project not found - redirect to step 1
+			void goto('/projects/new/event-info');
 		}
 	});
 
 	// Always allow proceeding (data sources are optional)
 	$effect(() => {
-		canProceedContext.value = !isNavigating && !isLoading;
+		canProceedContext.value = !isNavigating && !projectQuery.isLoading;
 	});
 
 	// Override the next button to save the project
@@ -68,8 +64,11 @@
 
 		isNavigating = true;
 		try {
-			await updateProject(projectId, {
-				dataSources: wizardState.dataSources
+			await updateMutation.mutateAsync({
+				id: projectId,
+				data: {
+					dataSources: wizardState.dataSources
+				}
 			});
 
 			await goto(`/projects/new/stamps?projectId=${projectId}`);
@@ -98,7 +97,7 @@
 	}
 </script>
 
-{#if isLoading}
+{#if projectQuery.isLoading}
 	<div class="flex items-center justify-center rounded-lg border border-gray-200 bg-white p-8">
 		<div class="text-center">
 			<div

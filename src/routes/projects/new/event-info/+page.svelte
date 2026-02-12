@@ -14,7 +14,7 @@
 
 	const today = new Date().toISOString().split('T')[0];
 
-	const projectIdParam = $page.url.searchParams.get('projectId');
+	const projectIdParam = page.url.searchParams.get('projectId');
 	let projectId = $state<string | null>(
 		projectIdParam && isValidUUID(projectIdParam) ? projectIdParam : null
 	);

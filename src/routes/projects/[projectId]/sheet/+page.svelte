@@ -1,46 +1,15 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { onMount } from 'svelte';
 	import { isValidUUID } from '$lib/utils/uuid';
-	import { getProject } from '$lib/data/projects';
-	import type { Project } from '$lib/types';
+	import { useProjectQuery } from '$lib/queries/projects.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import IconArrowLeft from '$lib/components/icons/IconArrowLeft.svelte';
 
-	let project = $state<Project | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+	const projectId = $derived(page.params.projectId || '');
+	const isValidId = $derived(isValidUUID(projectId));
 
-	const projectId = $derived($page.params.projectId || '');
-
-	onMount(async () => {
-		await loadProject();
-	});
-
-	async function loadProject() {
-		loading = true;
-		error = null;
-
-		if (!projectId || !isValidUUID(projectId)) {
-			error = 'Invalid project ID';
-			loading = false;
-			return;
-		}
-
-		try {
-			const p = await getProject(projectId);
-			if (!p) {
-				error = 'Project not found';
-			} else {
-				project = p;
-			}
-		} catch (err) {
-			console.error('Failed to load project:', err);
-			error = 'Failed to load project';
-		} finally {
-			loading = false;
-		}
-	}
+	const query = $derived(useProjectQuery(isValidId ? projectId : null));
+	const project = $derived(query.data);
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -52,31 +21,40 @@
 						href="/projects/{projectId}"
 						variant="ghost"
 						class="p-2"
-						aria-label="Back to ticket editor"
+						aria-label="Back to project"
 					>
 						<IconArrowLeft />
 					</Button>
-					<h1 class="text-3xl font-bold tracking-tight text-gray-900">Sheet Layout</h1>
+					<h1 class="text-3xl font-bold tracking-tight text-gray-900">
+						{project?.eventName || 'Loading...'} - Sheet Layout
+					</h1>
 				</div>
 			</div>
 		</div>
 	</header>
 
 	<main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-		{#if loading}
+		{#if query.isLoading}
 			<div class="flex items-center justify-center py-12">
-				<div class="text-gray-500">Loading project...</div>
+				<div class="text-center">
+					<div
+						class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"
+					></div>
+					<p class="mt-4 text-sm text-gray-600">Loading project...</p>
+				</div>
 			</div>
-		{:else if error}
+		{:else if query.isError || !isValidId}
 			<div class="rounded-lg border border-red-200 bg-red-50 p-8 text-center">
-				<p class="text-red-600">{error}</p>
-				<Button href="/projects/{projectId}" variant="secondary" class="mt-4">Back</Button>
+				<p class="text-red-600">
+					{!isValidId ? 'Invalid project ID' : 'Project not found'}
+				</p>
+				<Button href="/" variant="secondary" class="mt-4">Back to Projects</Button>
 			</div>
-		{:else}
+		{:else if project}
 			<div class="rounded-lg border border-gray-200 bg-white p-8 text-center">
-				<p class="text-gray-500">Sheet layout editor coming soon (Phase 5)</p>
+				<p class="text-gray-500">Sheet layout editor coming soon (Phase 3)</p>
 				<div class="mt-4 text-sm text-gray-400">
-					<p>Project: {project?.eventName}</p>
+					<p>This will allow you to configure how tickets are arranged on the print sheet.</p>
 				</div>
 			</div>
 		{/if}
