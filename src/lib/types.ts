@@ -123,6 +123,7 @@ export interface Project {
 	id: string;
 	eventName: string;
 	eventDate: string;
+	eventOrganizer: string;
 	ticketType: string;
 	templateImage: Blob;
 	stamps: Stamp[];

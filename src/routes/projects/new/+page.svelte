@@ -30,6 +30,7 @@
 		const project = await createProject({
 			eventName: formData.eventName as string,
 			eventDate: formData.eventDate as string,
+			eventOrganizer: formData.eventOrganizer as string,
 			ticketType: formData.ticketType as string,
 			templateImage: templateImageBlob,
 			dataSources: (formData.dataSources || []) as DataSource[],

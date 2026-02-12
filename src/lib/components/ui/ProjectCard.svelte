@@ -46,7 +46,12 @@
 	</div>
 	<div class="flex flex-1 flex-col p-4">
 		<h3 class="text-lg font-semibold text-gray-900">{project.eventName}</h3>
-		<p class="text-sm text-gray-600">{project.ticketType}</p>
+		<p class="text-sm text-gray-600">{project.eventOrganizer}</p>
+		<div class="mt-1 flex items-center gap-2 text-sm text-gray-500">
+			<span>{project.ticketType}</span>
+			<span>•</span>
+			<span>{new Date(project.eventDate).toLocaleDateString()}</span>
+		</div>
 		<div class="mt-2 flex items-center gap-4 text-sm text-gray-500">
 			<div class="flex items-center gap-1">
 				<IconTag />

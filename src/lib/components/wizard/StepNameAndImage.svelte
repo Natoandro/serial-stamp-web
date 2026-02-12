@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import TextInput from '$lib/components/ui/forms/TextInput.svelte';
-	import DateInput from '$lib/components/ui/forms/DateInput.svelte';
+	import Calendar from '$lib/components/ui/forms/Calendar.svelte';
 	import FileUpload from '$lib/components/ui/forms/FileUpload.svelte';
 
 	interface Props {
@@ -17,12 +17,14 @@
 
 	let eventName = $state((data.eventName as string) || '');
 	let eventDate = $state((data.eventDate as string) || '');
+	let eventOrganizer = $state((data.eventOrganizer as string) || '');
 	let ticketType = $state((data.ticketType as string) || '');
 	let templateImage = $state<File | null>((data.templateImageFile as File) || null);
 
 	const isValid = $derived(
 		eventName.trim() !== '' &&
 			eventDate.trim() !== '' &&
+			eventOrganizer.trim() !== '' &&
 			ticketType.trim() !== '' &&
 			templateImage !== null
 	);
@@ -36,6 +38,7 @@
 			dispatch('data', {
 				eventName: eventName.trim(),
 				eventDate: eventDate.trim(),
+				eventOrganizer: eventOrganizer.trim(),
 				ticketType: ticketType.trim(),
 				templateImageFile: templateImage
 			});
@@ -52,24 +55,35 @@
 	</div>
 
 	<div class="space-y-6">
+		<TextInput
+			bind:value={eventName}
+			label="Event Name"
+			placeholder="e.g., Summer Festival 2024"
+			required
+		/>
+
 		<div class="grid gap-6 md:grid-cols-2">
 			<TextInput
-				bind:value={eventName}
-				label="Event Name"
-				placeholder="e.g., Summer Festival 2024"
+				bind:value={eventOrganizer}
+				label="Event Organizer"
+				placeholder="e.g., City Arts Council"
 				required
 			/>
 
-			<DateInput bind:value={eventDate} label="Event Date" required />
+			<TextInput
+				bind:value={ticketType}
+				label="Ticket Type"
+				placeholder="e.g., General Admission, VIP, Student"
+				required
+			/>
 		</div>
 
-		<TextInput
-			bind:value={ticketType}
-			label="Ticket Type"
-			placeholder="e.g., General Admission, VIP, Student"
-			hint="What kind of ticket is this?"
-			required
-		/>
+		<div>
+			<div class="mb-2 block text-sm font-medium text-gray-700">
+				Event Date <span class="text-red-500">*</span>
+			</div>
+			<Calendar bind:value={eventDate} />
+		</div>
 
 		<FileUpload
 			bind:file={templateImage}
