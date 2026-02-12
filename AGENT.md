@@ -20,6 +20,8 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 
 - Use Svelte 5 and runes (`$state`, `$derived`, `$effect`, etc.).
 - Do not use legacy patterns like Svelte stores (`writable`, `readable`, `derived`) or store auto-subscriptions (`$store`).
+- Do not use deprecated Svelte features like `<slot>` - use `{@render children()}` with `Snippet` types instead.
+- Always use `$app/state` instead of `$app/stores` (e.g., `page` state from `$app/state`).
 - Prefer idiomatic SvelteKit patterns for data loading and routing.
 
 ## 3) Tasks/scripts discipline

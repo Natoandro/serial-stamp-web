@@ -1,49 +1,17 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import Wizard from '$lib/components/wizard/Wizard.svelte';
-	import StepNameAndImage from '$lib/components/wizard/StepNameAndImage.svelte';
-	import StepDataSources from '$lib/components/wizard/StepDataSources.svelte';
-	import StepStamps from '$lib/components/wizard/StepStamps.svelte';
-	import { createProject } from '$lib/data/projects';
-	import type { DataSource, Stamp } from '$lib/types';
-	import type { Component } from 'svelte';
+	import { onMount } from 'svelte';
 
-	const steps: Array<{ label: string; component: Component }> = [
-		{
-			label: 'Event & Ticket Info',
-			component: StepNameAndImage as unknown as Component
-		},
-		{
-			label: 'Data Sources',
-			component: StepDataSources as unknown as Component
-		},
-		{
-			label: 'Stamps',
-			component: StepStamps as unknown as Component
-		}
-	];
-
-	async function handleComplete(formData: Record<string, unknown>) {
-		// Convert File to Blob for storage
-		const templateImageBlob = formData.templateImageFile as Blob;
-
-		const project = await createProject({
-			eventName: formData.eventName as string,
-			eventDate: formData.eventDate as string,
-			eventOrganizer: formData.eventOrganizer as string,
-			ticketType: formData.ticketType as string,
-			templateImage: templateImageBlob,
-			dataSources: (formData.dataSources || []) as DataSource[],
-			stamps: (formData.stamps || []) as Stamp[]
-		});
-
-		// Navigate to the project editor
-		void goto(`/projects/${project.id}`);
-	}
-
-	function handleCancel() {
-		void goto('/');
-	}
+	onMount(() => {
+		void goto('/projects/new/event-info', { replaceState: true });
+	});
 </script>
 
-<Wizard {steps} onComplete={handleComplete} onCancel={handleCancel} />
+<div class="flex min-h-screen items-center justify-center bg-gray-50">
+	<div class="text-center">
+		<div
+			class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"
+		></div>
+		<p class="mt-4 text-sm text-gray-600">Loading wizard...</p>
+	</div>
+</div>

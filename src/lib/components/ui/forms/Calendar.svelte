@@ -22,8 +22,6 @@
 	let currentMonth = $state(value ? new Date(value).getMonth() : today.getMonth());
 	let currentYear = $state(value ? new Date(value).getFullYear() : today.getFullYear());
 
-	const selectedDate = $derived(value ? new Date(value) : null);
-
 	const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 	const MONTHS = [
 		'January',
@@ -171,7 +169,7 @@
 
 	<!-- Day labels -->
 	<div class="mb-2 grid grid-cols-7 gap-1">
-		{#each DAYS as day}
+		{#each DAYS as day (day)}
 			<div class="text-center text-xs font-medium text-gray-500">
 				{day}
 			</div>

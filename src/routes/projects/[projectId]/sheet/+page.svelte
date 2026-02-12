@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
+	import { isValidUUID } from '$lib/utils/uuid';
 	import { getProject } from '$lib/data/projects';
 	import type { Project } from '$lib/types';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -20,7 +21,7 @@
 		loading = true;
 		error = null;
 
-		if (!projectId) {
+		if (!projectId || !isValidUUID(projectId)) {
 			error = 'Invalid project ID';
 			loading = false;
 			return;
