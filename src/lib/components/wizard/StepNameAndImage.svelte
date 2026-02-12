@@ -21,6 +21,8 @@
 	let ticketType = $state((data.ticketType as string) || '');
 	let templateImage = $state<File | null>((data.templateImageFile as File) || null);
 
+	const today = new Date().toISOString().split('T')[0];
+
 	const isValid = $derived(
 		eventName.trim() !== '' &&
 			eventDate.trim() !== '' &&
@@ -54,68 +56,73 @@
 		</p>
 	</div>
 
-	<div class="space-y-6">
-		<TextInput
-			bind:value={eventName}
-			label="Event Name"
-			placeholder="e.g., Summer Festival 2024"
-			required
-		/>
-
-		<div class="grid gap-6 md:grid-cols-2">
+	<div class="grid gap-8 lg:grid-cols-2">
+		<!-- Left column: Form fields -->
+		<div class="space-y-6">
 			<TextInput
-				bind:value={eventOrganizer}
-				label="Event Organizer"
-				placeholder="e.g., City Arts Council"
+				bind:value={eventName}
+				label="Event Name"
+				placeholder="e.g., Summer Festival 2024"
 				required
 			/>
 
-			<TextInput
-				bind:value={ticketType}
-				label="Ticket Type"
-				placeholder="e.g., General Admission, VIP, Student"
+			<div class="grid gap-6 md:grid-cols-2">
+				<TextInput
+					bind:value={eventOrganizer}
+					label="Event Organizer"
+					placeholder="e.g., City Arts Council"
+					required
+				/>
+
+				<TextInput
+					bind:value={ticketType}
+					label="Ticket Type"
+					placeholder="e.g., General Admission, VIP, Student"
+					required
+				/>
+			</div>
+
+			<FileUpload
+				bind:file={templateImage}
+				label="Template Image"
+				hint="Upload an image that will serve as the base template for your tickets."
+				accept="image/*"
 				required
+				showPreview
 			/>
 		</div>
 
-		<div>
-			<div class="mb-2 block text-sm font-medium text-gray-700">
-				Event Date <span class="text-red-500">*</span>
-			</div>
-			<div class="grid gap-6 lg:grid-cols-2">
-				<Calendar bind:value={eventDate} />
-				<div class="flex flex-col justify-center">
-					<label for="selected-date" class="mb-2 block text-sm font-medium text-gray-700">
-						Selected Date
-					</label>
-					<input
-						type="text"
-						id="selected-date"
-						value={eventDate
-							? new Date(eventDate).toLocaleDateString(undefined, {
-									weekday: 'long',
-									year: 'numeric',
-									month: 'long',
-									day: 'numeric'
-								})
-							: 'No date selected'}
-						readonly
-						class="block w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm"
-					/>
-					{#if !eventDate}
-						<p class="mt-2 text-sm text-gray-500">Please select a date from the calendar.</p>
-					{/if}
+		<!-- Right column: Calendar and selected date -->
+		<div class="space-y-4">
+			<div>
+				<div class="mb-2 block text-sm font-medium text-gray-700">
+					Event Date <span class="text-red-500">*</span>
 				</div>
+				<Calendar bind:value={eventDate} min={today} />
+			</div>
+
+			<div>
+				<label for="selected-date" class="mb-2 block text-sm font-medium text-gray-700">
+					Selected Date
+				</label>
+				<input
+					type="text"
+					id="selected-date"
+					value={eventDate
+						? new Date(eventDate).toLocaleDateString(undefined, {
+								weekday: 'long',
+								year: 'numeric',
+								month: 'long',
+								day: 'numeric'
+							})
+						: 'No date selected'}
+					readonly
+					class="block w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm"
+				/>
+				{#if !eventDate}
+					<p class="mt-2 text-sm text-gray-500">Please select a date from the calendar.</p>
+				{/if}
 			</div>
 		</div>
-
-		<FileUpload
-			bind:file={templateImage}
-			label="Template Image"
-			hint="Upload an image that will serve as the base template for your tickets."
-			accept="image/*"
-			required
-			showPreview
-		/>
 	</div>
 </div>
