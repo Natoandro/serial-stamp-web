@@ -1,5 +1,12 @@
 <script lang="ts">
-	import type { Stamp, StampType, TextStamp, BarcodeStamp, QrCodeStamp } from '$lib/types';
+	import type {
+		Stamp,
+		StampType,
+		TextStamp,
+		BarcodeStamp,
+		QrCodeStamp,
+		DataSource
+	} from '$lib/types';
 	import Button from '$lib/components/ui/Button.svelte';
 	import IconText from '$lib/components/icons/IconText.svelte';
 	import IconBarcode from '$lib/components/icons/IconBarcode.svelte';
@@ -13,14 +20,14 @@
 	interface Props {
 		stamps: Stamp[];
 		selectedStampId: string | null;
-		availableVariables: string[];
+		dataSources: DataSource[];
 		onSelect: (id: string | null) => void;
 		onAdd: (type: StampType) => void;
 		onDelete: (id: string) => void;
 		onUpdate: (stamp: Stamp) => void;
 	}
 
-	let { stamps, selectedStampId, availableVariables, onSelect, onAdd, onDelete, onUpdate }: Props =
+	let { stamps, selectedStampId, dataSources, onSelect, onAdd, onDelete, onUpdate }: Props =
 		$props();
 
 	let showAddMenu = $state(false);
@@ -200,19 +207,19 @@
 								{#if stamp.type === 'text'}
 									<TextStampEditor
 										stamp={stamp as TextStamp}
-										{availableVariables}
+										{dataSources}
 										onUpdate={handleTextStampUpdate}
 									/>
 								{:else if stamp.type === 'barcode'}
 									<BarcodeStampEditor
 										stamp={stamp as BarcodeStamp}
-										{availableVariables}
+										{dataSources}
 										onUpdate={handleUpdateStamp}
 									/>
 								{:else if stamp.type === 'qrcode'}
 									<QrCodeStampEditor
 										stamp={stamp as QrCodeStamp}
-										{availableVariables}
+										{dataSources}
 										onUpdate={handleUpdateStamp}
 									/>
 								{/if}

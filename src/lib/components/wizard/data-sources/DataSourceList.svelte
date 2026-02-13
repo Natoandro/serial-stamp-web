@@ -11,11 +11,11 @@
 	function getSourceLabel(source: DataSource): string {
 		switch (source.type) {
 			case 'sequential':
-				return `Sequential: ${source.prefix || ''}${source.start}-${source.end} (step ${source.step})`;
+				return `${source.prefix || ''}${source.start}-${source.end} (step ${source.step})`;
 			case 'random':
-				return `Random: ${source.count} strings (length ${source.length})`;
+				return `${source.count} strings (length ${source.length})`;
 			case 'csv':
-				return `CSV: ${source.rows.length} rows, ${source.columns.length} columns`;
+				return `${source.rows.length} rows, ${source.columns.length} columns`;
 		}
 	}
 
@@ -33,8 +33,13 @@
 					class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
 				>
 					<div>
-						<p class="text-sm font-medium text-gray-900">{getSourceLabel(source)}</p>
-						<p class="text-xs text-gray-500">{getSourceType(source)}</p>
+						<div class="flex items-center gap-2">
+							<code class="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+								{source.name}
+							</code>
+							<span class="text-xs text-gray-500">{getSourceType(source)}</span>
+						</div>
+						<p class="mt-1 text-sm text-gray-700">{getSourceLabel(source)}</p>
 					</div>
 					<button
 						type="button"

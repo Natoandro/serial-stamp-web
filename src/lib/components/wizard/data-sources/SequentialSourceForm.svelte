@@ -9,6 +9,7 @@
 
 	let { onAdd }: Props = $props();
 
+	let name = $state('');
 	let prefix = $state('');
 	let start = $state(1);
 	let end = $state(100);
@@ -18,6 +19,7 @@
 	function handleAdd() {
 		onAdd({
 			type: 'sequential',
+			name: name.trim() || 'number',
 			prefix: prefix || undefined,
 			start,
 			end,
@@ -26,6 +28,7 @@
 		});
 
 		// Reset form
+		name = '';
 		prefix = '';
 		start = 1;
 		end = 100;
@@ -35,6 +38,14 @@
 </script>
 
 <div class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+	<TextInput
+		bind:value={name}
+		label="Variable Name"
+		placeholder="e.g., ticket_no"
+		hint="Used in templates as {'{{name}}'}. Defaults to 'number' if empty."
+		required
+	/>
+
 	<div class="grid grid-cols-2 gap-4">
 		<NumberInput bind:value={start} label="Start Number" placeholder="1" required />
 

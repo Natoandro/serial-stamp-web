@@ -1,13 +1,14 @@
 <script lang="ts">
-	import type { BarcodeStamp, BarcodeFormat } from '$lib/types';
+	import type { BarcodeStamp, BarcodeFormat, DataSource } from '$lib/types';
+	import TemplateSyntaxHelp from '$lib/components/ui/TemplateSyntaxHelp.svelte';
 
 	interface Props {
 		stamp: BarcodeStamp;
-		availableVariables: string[];
+		dataSources: DataSource[];
 		onUpdate: (patch: Partial<BarcodeStamp>) => void;
 	}
 
-	let { stamp, availableVariables, onUpdate }: Props = $props();
+	let { stamp, dataSources, onUpdate }: Props = $props();
 
 	const formats: { value: BarcodeFormat; label: string }[] = [
 		{ value: 'code128', label: 'Code 128' },
@@ -19,11 +20,6 @@
 		{ value: 'code93', label: 'Code 93' },
 		{ value: 'itf14', label: 'ITF-14' }
 	];
-
-	function insertVariable(variable: string) {
-		const placeholder = `{{${variable}}}`;
-		onUpdate({ template: stamp.template + placeholder });
-	}
 </script>
 
 <div class="space-y-4">
@@ -38,22 +34,13 @@
 				class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
 				value={stamp.template}
 				oninput={(e) => onUpdate({ template: e.currentTarget.value })}
-				placeholder="e.g. {'{{number}}'}"
+				placeholder="e.g. {'{{ticket_no}}'}"
 			/>
 		</div>
-		{#if availableVariables.length > 0}
-			<div class="mt-2 flex flex-wrap gap-2">
-				{#each availableVariables as variable (variable)}
-					<button
-						type="button"
-						onclick={() => insertVariable(variable)}
-						class="inline-flex items-center rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
-					>
-						+{variable}
-					</button>
-				{/each}
-			</div>
-		{/if}
+	</div>
+
+	<div>
+		<TemplateSyntaxHelp {dataSources} />
 	</div>
 
 	<div>

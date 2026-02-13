@@ -61,6 +61,7 @@ export type DataSourceType = 'csv' | 'sequential' | 'random';
 
 export interface BaseDataSource {
 	id: string;
+	name: string;
 	type: DataSourceType;
 }
 

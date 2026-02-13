@@ -7,6 +7,7 @@
 
 	let { onAdd }: Props = $props();
 
+	let name = $state('');
 	let columns = $state<string[]>([]);
 	let rows = $state<Record<string, string>[]>([]);
 	let error = $state<string | null>(null);
@@ -53,11 +54,13 @@
 
 		onAdd({
 			type: 'csv',
+			name: name.trim() || 'csv',
 			columns,
 			rows
 		});
 
 		// Reset form
+		name = '';
 		columns = [];
 		rows = [];
 		error = null;
@@ -65,6 +68,20 @@
 </script>
 
 <div class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+	<div>
+		<label for="csv-name" class="mb-1 block text-sm font-medium text-gray-700">Source Name</label>
+		<input
+			type="text"
+			id="csv-name"
+			bind:value={name}
+			placeholder="e.g., attendees"
+			class="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+		/>
+		<p class="mt-1 text-xs text-gray-500">
+			Used in templates as {'{{name.field}}'}. Defaults to 'csv' if empty.
+		</p>
+	</div>
+
 	<div>
 		<label for="csv-file" class="mb-1 block text-sm font-medium text-gray-700">CSV File</label>
 		<input

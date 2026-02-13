@@ -3,7 +3,7 @@
 	import { v4 as uuidv4 } from 'uuid';
 	import { isValidUUID } from '$lib/utils/uuid';
 	import { useProjectQuery, useUpdateProjectMutation } from '$lib/queries/projects.svelte';
-	import { generatePreviewRecord, getAvailableKeys } from '$lib/engine/data';
+	import { generatePreviewRecord } from '$lib/engine/data';
 	import type { Stamp, StampType, Project } from '$lib/types';
 	import TicketPreview from '$lib/components/editor/TicketPreview.svelte';
 	import StampPanel from '$lib/components/editor/StampPanel.svelte';
@@ -20,7 +20,6 @@
 
 	let selectedStampId = $state<string | null>(null);
 
-	const availableVariables = $derived(project ? getAvailableKeys(project.dataSources) : []);
 	const selectedRecord = $derived(project ? generatePreviewRecord(project.dataSources) : {});
 
 	let debounceTimer: ReturnType<typeof setTimeout>;
@@ -218,7 +217,7 @@
 				<StampPanel
 					stamps={project.stamps}
 					{selectedStampId}
-					{availableVariables}
+					dataSources={project.dataSources}
 					onSelect={(id) => (selectedStampId = id)}
 					onAdd={handleAddStamp}
 					onDelete={handleDeleteStamp}

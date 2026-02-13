@@ -11,6 +11,7 @@
 
 	type CharsetType = 'alphanumeric' | 'numeric' | 'alpha' | 'custom';
 
+	let name = $state('');
 	let charset = $state<CharsetType>('alphanumeric');
 	let customCharset = $state('');
 	let length = $state(8);
@@ -32,12 +33,14 @@
 	function handleAdd() {
 		onAdd({
 			type: 'random',
+			name: name.trim() || 'random',
 			charset: getCharsetString(charset),
 			length,
 			count
 		});
 
 		// Reset form
+		name = '';
 		charset = 'alphanumeric';
 		customCharset = '';
 		length = 8;
@@ -46,6 +49,14 @@
 </script>
 
 <div class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+	<TextInput
+		bind:value={name}
+		label="Variable Name"
+		placeholder="e.g., code"
+		hint="Used in templates as {'{{name}}'}. Defaults to 'random' if empty."
+		required
+	/>
+
 	<div>
 		<label for="random-charset" class="mb-1 block text-sm font-medium text-gray-700">
 			Character Set

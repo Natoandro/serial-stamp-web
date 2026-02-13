@@ -1,10 +1,11 @@
-import type { Stamp, TextStamp } from '$lib/types';
+import type { Stamp, TextStamp, DataSource } from '$lib/types';
 import { resolveTemplate } from '$lib/engine/template';
 
 export interface TicketRendererOptions {
 	ctx: CanvasRenderingContext2D;
 	templateImage: ImageBitmap | HTMLImageElement;
 	stamps: Stamp[];
+	dataSources: DataSource[];
 	dpiScale?: number;
 }
 
@@ -12,12 +13,14 @@ export class TicketRenderer {
 	private ctx: CanvasRenderingContext2D;
 	private templateImage: ImageBitmap | HTMLImageElement;
 	private stamps: Stamp[];
+	private dataSources: DataSource[];
 	private dpiScale: number;
 
 	constructor(options: TicketRendererOptions) {
 		this.ctx = options.ctx;
 		this.templateImage = options.templateImage;
 		this.stamps = options.stamps;
+		this.dataSources = options.dataSources;
 		this.dpiScale = options.dpiScale || 1;
 	}
 
@@ -61,7 +64,7 @@ export class TicketRenderer {
 
 	private renderTextStamp(stamp: TextStamp, record: Record<string, string>): void {
 		const { ctx } = this;
-		const text = resolveTemplate(stamp.template, record);
+		const text = resolveTemplate(stamp.template, record, this.dataSources);
 
 		ctx.font = `${stamp.fontSize}px ${stamp.fontFamily}`;
 		ctx.fillStyle = stamp.color;
@@ -145,7 +148,7 @@ export class TicketRenderer {
 		record: Record<string, string>
 	): { width: number; height: number } {
 		const { ctx } = this;
-		const text = resolveTemplate(stamp.template, record);
+		const text = resolveTemplate(stamp.template, record, this.dataSources);
 
 		ctx.save();
 		ctx.font = `${stamp.fontSize}px ${stamp.fontFamily}`;

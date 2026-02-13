@@ -128,6 +128,7 @@
 					ctx,
 					templateImage: img,
 					stamps,
+					dataSources: project.dataSources,
 					dpiScale: dpi
 				});
 
