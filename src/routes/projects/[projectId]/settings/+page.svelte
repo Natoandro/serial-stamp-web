@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import { goto, beforeNavigate } from '$app/navigation';
 	import { isValidUUID } from '$lib/utils/uuid';
 	import { useProjectQuery, useUpdateProjectMutation } from '$lib/queries/projects.svelte';
 	import EventInfoForm from '$lib/components/forms/EventInfoForm.svelte';
@@ -22,8 +22,18 @@
 	);
 
 	let isSaving = $state(false);
-	let eventFormRef: EventInfoForm;
-	let dataFormRef: DataSourcesForm;
+	let eventFormRef = $state<EventInfoForm | null>(null);
+	let dataFormRef = $state<DataSourcesForm | null>(null);
+
+	// Track form dirty state
+	let isFormDirty = $state(false);
+
+	// Prevent navigation if form is dirty
+	beforeNavigate((navigation) => {
+		if (isFormDirty && !confirm('You have unsaved changes. Are you sure you want to leave?')) {
+			navigation.cancel();
+		}
+	});
 
 	function switchTab(tab: 'event' | 'data') {
 		const url = new URL(page.url);
@@ -31,11 +41,12 @@
 		void goto(url.toString(), { replaceState: true });
 	}
 
-	function handleSave() {
-		// Trigger the active form's submission
-		const formId = activeTab === 'event' ? 'event-info-form' : 'data-sources-form';
-		const form = document.getElementById(formId) as HTMLFormElement;
-		form?.requestSubmit();
+	function handleSaveEvent() {
+		eventFormRef?.submit();
+	}
+
+	function handleResetEvent() {
+		eventFormRef?.handleReset();
 	}
 
 	async function handleEventInfoSubmit(data: ProjectSettings) {
@@ -60,6 +71,9 @@
 				data: updateData
 			});
 
+			// Reset form dirty state since save was successful
+			eventFormRef?.handleSaveSuccess();
+
 			// Success - could show a toast notification
 		} catch (error) {
 			console.error('Failed to save changes:', error);
@@ -69,10 +83,9 @@
 		}
 	}
 
-	async function handleDataSourcesSubmit(sources: DataSource[]) {
-		if (!projectId || isSaving) return;
+	async function handleDataSourcesChange(sources: DataSource[]) {
+		if (!projectId) return;
 
-		isSaving = true;
 		try {
 			await updateMutation.mutateAsync({
 				id: projectId,
@@ -80,13 +93,9 @@
 					dataSources: sources
 				}
 			});
-
-			// Success - could show a toast notification
 		} catch (error) {
-			console.error('Failed to save changes:', error);
-			alert('Failed to save changes. Please try again.');
-		} finally {
-			isSaving = false;
+			console.error('Failed to save data sources:', error);
+			alert('Failed to save data sources. Please try again.');
 		}
 	}
 
@@ -112,9 +121,6 @@
 				</div>
 				<div class="flex items-center gap-3">
 					<Button variant="secondary" onclick={handleCancel}>Cancel</Button>
-					<Button onclick={handleSave} disabled={isSaving}>
-						{isSaving ? 'Saving...' : 'Save Changes'}
-					</Button>
 				</div>
 			</div>
 		</div>
@@ -174,11 +180,27 @@
 				<!-- Tab Content -->
 				<div class="rounded-lg border border-gray-200 bg-white p-8">
 					{#if activeTab === 'event'}
-						<div class="mb-6">
-							<h2 class="text-lg font-semibold text-gray-900">Event & Ticket Information</h2>
-							<p class="mt-1 text-sm text-gray-600">
-								Update your event details and ticket template.
-							</p>
+						<div class="mb-6 flex items-start justify-between gap-4">
+							<div>
+								<h2 class="text-lg font-semibold text-gray-900">Event & Ticket Information</h2>
+								<p class="mt-1 text-sm text-gray-600">
+									Update your event details and ticket template.
+								</p>
+							</div>
+
+							<div class="flex items-center gap-3">
+								<Button
+									type="button"
+									variant="secondary"
+									onclick={handleResetEvent}
+									disabled={!isFormDirty || isSaving}
+								>
+									Reset
+								</Button>
+								<Button type="button" onclick={handleSaveEvent} disabled={!isFormDirty || isSaving}>
+									{isSaving ? 'Saving...' : 'Save'}
+								</Button>
+							</div>
 						</div>
 						<EventInfoForm
 							bind:this={eventFormRef}
@@ -191,6 +213,7 @@
 							currentTemplateImage={project.templateImage}
 							requireImage={false}
 							onSubmit={handleEventInfoSubmit}
+							onDirtyChange={(dirty) => (isFormDirty = dirty)}
 						/>
 					{:else if activeTab === 'data'}
 						<div class="mb-6">
@@ -202,7 +225,7 @@
 						<DataSourcesForm
 							bind:this={dataFormRef}
 							initialData={project.dataSources}
-							onSubmit={handleDataSourcesSubmit}
+							onChange={handleDataSourcesChange}
 						/>
 					{/if}
 				</div>

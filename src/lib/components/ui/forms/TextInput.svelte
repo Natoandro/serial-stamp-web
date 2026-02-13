@@ -13,6 +13,8 @@
 		label?: string;
 		hint?: string;
 		error?: string;
+		oninput?: (value: string) => void;
+		onblur?: () => void;
 	}
 
 	let {
@@ -27,6 +29,8 @@
 		label,
 		hint,
 		error,
+		oninput,
+		onblur,
 		...props
 	}: Props = $props();
 
@@ -48,10 +52,23 @@
 		{type}
 		id={inputId}
 		{name}
-		bind:value
+		{value}
 		{placeholder}
 		{required}
 		{disabled}
+		oninput={(e) => {
+			const newValue = (e.target as HTMLInputElement).value;
+			if (oninput) {
+				oninput(newValue);
+			} else {
+				value = newValue;
+			}
+		}}
+		onblur={() => {
+			if (onblur) {
+				onblur();
+			}
+		}}
 		class={cn(
 			'block w-full rounded-md border px-3 py-2 text-sm shadow-sm transition-colors',
 			'placeholder:text-gray-400',

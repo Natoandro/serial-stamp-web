@@ -52,7 +52,13 @@
 		</p>
 	</div>
 
-	<DataSourceList sources={dataSources} onRemove={removeSource} />
+	<DataSourceList
+		sources={dataSources}
+		onRemove={removeSource}
+		onUpdate={(next) => {
+			dataSources = dataSources.map((s) => (s.id === next.id ? next : s));
+		}}
+	/>
 
 	<!-- Source Type Selector -->
 	<div class="mb-6">

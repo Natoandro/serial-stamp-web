@@ -11,6 +11,9 @@
 	const wizardState = getContext<WizardState>('wizardState');
 	const canProceedContext = getContext<{ value: boolean }>('canProceed');
 
+	let dataFormRef: DataSourcesForm;
+	let currentDataSources = $state<DataSource[]>([]);
+
 	const projectIdParam = page.url.searchParams.get('projectId');
 	let projectId = $state<string | null>(
 		projectIdParam && isValidUUID(projectIdParam) ? projectIdParam : null
@@ -53,14 +56,11 @@
 		};
 	});
 
-	function handleNext() {
-		// Trigger form submission
-		const form = document.getElementById('data-sources-form') as HTMLFormElement;
-		form?.requestSubmit();
-	}
-
-	async function handleSubmit(dataSources: DataSource[]) {
+	async function handleNext() {
 		if (isNavigating || !projectId) return;
+
+		// Get current data sources from the form
+		const dataSources = dataFormRef?.getDataSources() || [];
 
 		// Update wizard state
 		wizardState.dataSources = dataSources;
@@ -78,9 +78,14 @@
 		} catch (error) {
 			console.error('Failed to update project:', error);
 			alert('Failed to save data sources. Please try again.');
-		} finally {
 			isNavigating = false;
 		}
+	}
+
+	function handleDataSourcesChange(dataSources: DataSource[]) {
+		// Just update local state, don't save until Next is clicked
+		currentDataSources = dataSources;
+		wizardState.dataSources = dataSources;
 	}
 </script>
 
@@ -103,7 +108,11 @@
 			</p>
 		</div>
 
-		<DataSourcesForm initialData={wizardState.dataSources} onSubmit={handleSubmit} />
+		<DataSourcesForm
+			bind:this={dataFormRef}
+			initialData={wizardState.dataSources}
+			onChange={handleDataSourcesChange}
+		/>
 
 		{#if isNavigating}
 			<div class="mt-6 text-center text-sm text-gray-600">Saving...</div>
