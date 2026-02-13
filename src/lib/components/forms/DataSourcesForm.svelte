@@ -102,5 +102,8 @@
 		{:else if selectedType === 'csv'}
 			<CsvSourceForm onAdd={handleAddCsv} />
 		{/if}
+
+		<!-- Hidden submit button for form.requestSubmit() -->
+		<button type="submit" class="sr-only" tabindex="-1" aria-hidden="true">Submit</button>
 	</div>
 </form>
