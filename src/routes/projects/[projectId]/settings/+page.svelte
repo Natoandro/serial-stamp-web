@@ -188,6 +188,7 @@
 								eventOrganizer: project.eventOrganizer,
 								ticketType: project.ticketType
 							}}
+							existingTemplateImage={project.templateImage}
 							requireImage={false}
 							onSubmit={handleEventInfoSubmit}
 						/>

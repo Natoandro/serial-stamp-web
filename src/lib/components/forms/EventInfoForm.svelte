@@ -6,6 +6,7 @@
 
 	interface Props {
 		initialData?: Partial<ProjectSettings>;
+		existingTemplateImage?: Blob | null;
 		onSubmit: (data: ProjectSettings) => void | Promise<void>;
 		formId?: string;
 		requireImage?: boolean;
@@ -13,6 +14,7 @@
 
 	let {
 		initialData = {},
+		existingTemplateImage = null,
 		onSubmit,
 		formId = 'event-info-form',
 		requireImage = true
@@ -72,6 +74,7 @@
 
 			<FileUpload
 				bind:file={templateImage}
+				existingImage={existingTemplateImage}
 				label="Template Image"
 				hint="Upload an image that will serve as the base template for your tickets."
 				accept="image/*"

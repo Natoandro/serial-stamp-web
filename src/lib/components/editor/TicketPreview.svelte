@@ -230,10 +230,18 @@
 		const x = (event.clientX - rect.left) / scale;
 		const y = (event.clientY - rect.top) / scale;
 
+		// Error margin in pixels for easier selection (scaled to template coordinates)
+		const margin = 5 / scale;
+
 		// Find stamp under cursor (reverse order to get top-most)
 		const clickedStamp = [...localStamps].reverse().find((stamp) => {
 			const b = getVisualBounds(stamp);
-			return x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height;
+			return (
+				x >= b.x - margin &&
+				x <= b.x + b.width + margin &&
+				y >= b.y - margin &&
+				y <= b.y + b.height + margin
+			);
 		});
 
 		onSelectStamp?.(clickedStamp ? clickedStamp.id : null);

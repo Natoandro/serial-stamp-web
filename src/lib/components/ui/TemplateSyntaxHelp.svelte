@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { DataSource } from '$lib/types';
 	import { getAvailableVariables } from '$lib/engine/template';
+	import Accordion from './Accordion.svelte';
 
 	interface Props {
 		dataSources: DataSource[];
@@ -15,21 +16,20 @@
 </script>
 
 {#if hasVariables}
-	<div class="rounded-md border border-blue-200 bg-blue-50 p-4">
-		<h4 class="mb-2 text-sm font-semibold text-blue-900">Available Variables</h4>
-		<div class="mb-3 space-y-1 text-xs text-blue-800">
+	<Accordion title="Template Syntax Help">
+		<div class="mb-3 space-y-1 text-xs text-gray-700">
 			<p>Use double curly braces to insert dynamic data:</p>
 			<ul class="ml-4 list-disc space-y-0.5">
 				<li>
-					<code class="rounded bg-blue-100 px-1 py-0.5">{'{{name}}'}</code> for scalar sources (sequential,
+					<code class="rounded bg-gray-100 px-1 py-0.5">{'{{name}}'}</code> for scalar sources (sequential,
 					random)
 				</li>
 				<li>
-					<code class="rounded bg-blue-100 px-1 py-0.5">{'{{source.field}}'}</code> for CSV fields
+					<code class="rounded bg-gray-100 px-1 py-0.5">{'{{source.field}}'}</code> for CSV fields
 				</li>
 				{#if hasOnlyCsvSource}
 					<li>
-						<code class="rounded bg-blue-100 px-1 py-0.5">{'{{.field}}'}</code> shorthand when only one
+						<code class="rounded bg-gray-100 px-1 py-0.5">{'{{.field}}'}</code> shorthand when only one
 						CSV source
 					</li>
 				{/if}
@@ -38,7 +38,7 @@
 
 		<div class="max-h-48 space-y-2 overflow-y-auto">
 			{#each variables as variable (variable.syntax)}
-				<div class="rounded bg-white px-3 py-2 shadow-sm">
+				<div class="rounded border border-gray-200 bg-gray-50 px-3 py-2">
 					<div class="flex items-center justify-between">
 						<code class="font-mono text-xs font-semibold text-blue-700">{variable.syntax}</code>
 						<span class="text-xs text-gray-500">{variable.source}</span>
@@ -47,7 +47,7 @@
 				</div>
 			{/each}
 		</div>
-	</div>
+	</Accordion>
 {:else}
 	<div class="rounded-md border border-gray-200 bg-gray-50 p-4">
 		<p class="text-sm text-gray-600">

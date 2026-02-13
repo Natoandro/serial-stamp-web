@@ -5,6 +5,7 @@
 		id?: string;
 		accept?: string;
 		file?: File | null;
+		existingImage?: Blob | null;
 		required?: boolean;
 		disabled?: boolean;
 		class?: string;
@@ -19,6 +20,7 @@
 		id,
 		accept = 'image/*',
 		file = $bindable(null),
+		existingImage = null,
 		required = false,
 		disabled = false,
 		class: className = '',
@@ -34,6 +36,22 @@
 	const hasError = $derived(!!error);
 
 	let previewUrl = $state<string | null>(null);
+	let existingImageUrl = $state<string | null>(null);
+
+	// Create URL for existing image
+	$effect(() => {
+		if (existingImage) {
+			if (existingImageUrl) {
+				URL.revokeObjectURL(existingImageUrl);
+			}
+			existingImageUrl = URL.createObjectURL(existingImage);
+		}
+		return () => {
+			if (existingImageUrl) {
+				URL.revokeObjectURL(existingImageUrl);
+			}
+		};
+	});
 
 	function handleFileChange(event: Event) {
 		const input = event.target as HTMLInputElement;
@@ -74,7 +92,7 @@
 		<p class="text-sm text-gray-500">{hint}</p>
 	{/if}
 
-	{#if !file}
+	{#if !file && !existingImage}
 		<label
 			for={inputId}
 			class={cn(
@@ -115,7 +133,7 @@
 			class="sr-only"
 			{...props}
 		/>
-	{:else}
+	{:else if file}
 		<div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
 			<div class="flex items-start gap-4">
 				{#if showPreview && previewUrl}
@@ -137,6 +155,39 @@
 					>
 						Remove
 					</button>
+				</div>
+			</div>
+		</div>
+	{:else if existingImage}
+		<div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+			<div class="flex items-start gap-4">
+				{#if showPreview && existingImageUrl}
+					<div class="shrink-0">
+						<img
+							src={existingImageUrl}
+							alt="Current template"
+							class="h-32 w-32 rounded-lg border border-gray-300 object-contain"
+						/>
+					</div>
+				{/if}
+				<div class="min-w-0 flex-1">
+					<p class="text-sm font-medium text-gray-900">Current template image</p>
+					<p class="mt-1 text-xs text-gray-500">{(existingImage.size / 1024).toFixed(1)} KB</p>
+					<label
+						for={inputId}
+						class="mt-2 inline-block cursor-pointer text-sm font-medium text-blue-600 hover:text-blue-500"
+					>
+						Replace
+					</label>
+					<input
+						type="file"
+						id={inputId}
+						{accept}
+						onchange={handleFileChange}
+						{disabled}
+						class="sr-only"
+						{...props}
+					/>
 				</div>
 			</div>
 		</div>

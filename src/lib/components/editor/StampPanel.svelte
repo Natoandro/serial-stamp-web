@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { slide } from 'svelte/transition';
 	import type {
 		Stamp,
 		StampType,
@@ -203,7 +204,10 @@
 						</div>
 
 						{#if selectedStampId === stamp.id}
-							<div class="border-t border-gray-100 bg-gray-50/50 p-4">
+							<div
+								transition:slide={{ duration: 200 }}
+								class="border-t border-gray-100 bg-gray-50/50 p-4"
+							>
 								{#if stamp.type === 'text'}
 									<TextStampEditor
 										stamp={stamp as TextStamp}
@@ -223,6 +227,16 @@
 										onUpdate={handleUpdateStamp}
 									/>
 								{/if}
+
+								<div class="mt-4 border-t border-gray-200 pt-4">
+									<button
+										type="button"
+										onclick={() => onSelect(null)}
+										class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
+									>
+										Done
+									</button>
+								</div>
 							</div>
 						{/if}
 					</li>
