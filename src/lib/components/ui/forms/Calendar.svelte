@@ -6,6 +6,8 @@
 		min?: string;
 		max?: string;
 		class?: string;
+		name?: string;
+		required?: boolean;
 		onchange?: (date: string) => void;
 	}
 
@@ -14,9 +16,19 @@
 		min,
 		max,
 		class: className = '',
+		name,
+		required = false,
 		onchange,
 		...props
 	}: Props = $props();
+
+	// Internal state for selected date
+	let selectedDate = $state(value || '');
+
+	// Sync internal state with value prop
+	$effect(() => {
+		selectedDate = value || '';
+	});
 
 	const today = new Date();
 	let currentMonth = $state(value ? new Date(value).getMonth() : today.getMonth());
@@ -100,12 +112,13 @@
 	}
 
 	function isSelected(dateString: string): boolean {
-		return value === dateString;
+		return selectedDate === dateString;
 	}
 
 	function selectDate(dateString: string) {
 		if (isDateDisabled(dateString)) return;
-		value = dateString;
+		selectedDate = dateString;
+		value = dateString; // Update bindable value if using controlled mode
 		onchange?.(dateString);
 	}
 
@@ -133,6 +146,11 @@
 		selectDate(formatDateString(today.getFullYear(), today.getMonth(), today.getDate()));
 	}
 </script>
+
+{#if name}
+	<!-- Hidden input for form submission -->
+	<input type="hidden" {name} value={selectedDate} {required} />
+{/if}
 
 <div class={cn('rounded-lg border border-gray-200 bg-white p-4', className)} {...props}>
 	<!-- Header -->
@@ -210,4 +228,17 @@
 			Today
 		</button>
 	</div>
+
+	{#if selectedDate}
+		<div class="mt-3 text-center text-sm text-gray-600">
+			{new Date(selectedDate).toLocaleDateString(undefined, {
+				weekday: 'long',
+				year: 'numeric',
+				month: 'long',
+				day: 'numeric'
+			})}
+		</div>
+	{:else if required}
+		<p class="mt-3 text-center text-sm text-gray-500">Please select a date</p>
+	{/if}
 </div>

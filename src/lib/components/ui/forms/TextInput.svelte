@@ -3,6 +3,7 @@
 
 	interface Props {
 		id?: string;
+		name?: string;
 		type?: 'text' | 'email' | 'password' | 'tel' | 'url';
 		value?: string;
 		placeholder?: string;
@@ -16,6 +17,7 @@
 
 	let {
 		id,
+		name,
 		type = 'text',
 		value = $bindable(''),
 		placeholder,
@@ -45,17 +47,19 @@
 	<input
 		{type}
 		id={inputId}
+		{name}
 		bind:value
 		{placeholder}
 		{required}
 		{disabled}
 		class={cn(
-			'block w-full rounded-md border px-3 py-2 shadow-sm transition-colors',
-			'focus:ring-1 focus:outline-none',
+			'block w-full rounded-md border px-3 py-2 text-sm shadow-sm transition-colors',
+			'placeholder:text-gray-400',
+			'focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none',
+			'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500',
 			hasError
-				? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-				: 'border-gray-300 focus:border-blue-500 focus:ring-blue-500',
-			disabled && 'cursor-not-allowed bg-gray-50 text-gray-500'
+				? 'border-red-300 text-red-900 focus:border-red-500 focus:ring-red-500'
+				: 'border-gray-300 text-gray-900'
 		)}
 		{...props}
 	/>

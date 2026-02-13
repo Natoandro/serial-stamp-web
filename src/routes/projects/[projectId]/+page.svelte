@@ -9,6 +9,7 @@
 	import StampPanel from '$lib/components/editor/StampPanel.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import IconArrowLeft from '$lib/components/icons/IconArrowLeft.svelte';
+	import IconSettings from '$lib/components/icons/IconSettings.svelte';
 
 	const projectId = $derived(page.params.projectId || '');
 	const isValidId = $derived(isValidUUID(projectId));
@@ -157,6 +158,14 @@
 				</div>
 				<div class="flex items-center gap-3">
 					{#if project}
+						<Button
+							href="/projects/{projectId}/settings"
+							variant="secondary"
+							class="flex items-center gap-2"
+						>
+							<IconSettings class="h-4 w-4" />
+							Settings
+						</Button>
 						<Button href="/projects/{projectId}/sheet" variant="secondary">Sheet Layout</Button>
 						<Button>Export PDF</Button>
 					{/if}

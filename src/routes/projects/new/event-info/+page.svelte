@@ -3,16 +3,13 @@
 	import { page } from '$app/state';
 	import { getContext } from 'svelte';
 	import { isValidUUID } from '$lib/utils/uuid';
-	import TextInput from '$lib/components/ui/forms/TextInput.svelte';
-	import Calendar from '$lib/components/ui/forms/Calendar.svelte';
-	import FileUpload from '$lib/components/ui/forms/FileUpload.svelte';
+	import EventInfoForm from '$lib/components/forms/EventInfoForm.svelte';
 	import { createProject, updateProject } from '$lib/data/projects';
 	import type { WizardState } from '$lib/stores/wizard.svelte';
+	import type { ProjectSettings } from '$lib/types';
 
 	const wizardState = getContext<WizardState>('wizardState');
 	const canProceedContext = getContext<{ value: boolean }>('canProceed');
-
-	const today = new Date().toISOString().split('T')[0];
 
 	const projectIdParam = page.url.searchParams.get('projectId');
 	let projectId = $state<string | null>(
@@ -20,19 +17,11 @@
 	);
 	let isNavigating = $state(false);
 
-	const isValid = $derived(
-		wizardState.eventName.trim() !== '' &&
-			wizardState.eventDate.trim() !== '' &&
-			wizardState.eventOrganizer.trim() !== '' &&
-			wizardState.ticketType.trim() !== '' &&
-			wizardState.templateImageFile !== null
-	);
-
 	$effect(() => {
-		canProceedContext.value = isValid && !isNavigating;
+		canProceedContext.value = !isNavigating;
 	});
 
-	// Override the next button to save the project first
+	// Override the next button to submit the form
 	const onFinishContext = getContext<{ value: (() => void | Promise<void>) | null }>('onFinish');
 
 	$effect(() => {
@@ -42,30 +31,51 @@
 		};
 	});
 
-	async function handleNext() {
-		if (!isValid || isNavigating || !wizardState.templateImageFile) return;
+	function handleNext() {
+		// Trigger form submission
+		const form = document.getElementById('event-info-form') as HTMLFormElement;
+		form?.requestSubmit();
+	}
+
+	async function handleSubmit(data: ProjectSettings) {
+		if (isNavigating) return;
+
+		// Update wizard state
+		wizardState.eventName = data.eventName;
+		wizardState.eventDate = data.eventDate;
+		wizardState.eventOrganizer = data.eventOrganizer;
+		wizardState.ticketType = data.ticketType;
+		if (data.templateImage) {
+			wizardState.templateImageFile = data.templateImage;
+		}
 
 		isNavigating = true;
 		try {
 			if (projectId) {
 				// Update existing project
-				await updateProject(projectId, {
-					eventName: wizardState.eventName.trim(),
-					eventDate: wizardState.eventDate.trim(),
-					eventOrganizer: wizardState.eventOrganizer.trim(),
-					ticketType: wizardState.ticketType.trim(),
-					templateImage: wizardState.templateImageFile,
+				const updateData: any = {
+					eventName: data.eventName,
+					eventDate: data.eventDate,
+					eventOrganizer: data.eventOrganizer,
+					ticketType: data.ticketType,
 					dataSources: wizardState.dataSources,
 					stamps: wizardState.stamps
-				});
+				};
+
+				// Only update template image if a new one was uploaded
+				if (data.templateImage) {
+					updateData.templateImage = data.templateImage;
+				}
+
+				await updateProject(projectId, updateData);
 			} else {
 				// Create new project
 				const project = await createProject({
-					eventName: wizardState.eventName.trim(),
-					eventDate: wizardState.eventDate.trim(),
-					eventOrganizer: wizardState.eventOrganizer.trim(),
-					ticketType: wizardState.ticketType.trim(),
-					templateImage: wizardState.templateImageFile,
+					eventName: data.eventName,
+					eventDate: data.eventDate,
+					eventOrganizer: data.eventOrganizer,
+					ticketType: data.ticketType,
+					templateImage: (data.templateImage || wizardState.templateImageFile)!,
 					dataSources: wizardState.dataSources,
 					stamps: wizardState.stamps
 				});
@@ -91,69 +101,15 @@
 		</p>
 	</div>
 
-	<div class="grid gap-8 lg:grid-cols-2">
-		<!-- Left column: Form fields -->
-		<div class="space-y-6">
-			<TextInput
-				bind:value={wizardState.eventName}
-				label="Event Name"
-				placeholder="e.g., Summer Festival 2024"
-				required
-			/>
-
-			<div class="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
-				<TextInput
-					bind:value={wizardState.eventOrganizer}
-					label="Event Organizer"
-					placeholder="e.g., City Arts Council"
-					required
-				/>
-
-				<TextInput
-					bind:value={wizardState.ticketType}
-					label="Ticket Type"
-					placeholder="e.g., General Admission, VIP, Student"
-					required
-				/>
-			</div>
-
-			<FileUpload
-				bind:file={wizardState.templateImageFile}
-				label="Template Image"
-				hint="Upload an image that will serve as the base template for your tickets."
-				accept="image/*"
-				required
-				showPreview
-			/>
-		</div>
-
-		<!-- Right column: Calendar and selected date -->
-		<div class="space-y-4">
-			<div>
-				<div class="mb-2 block text-sm font-medium text-gray-700">
-					Event Date <span class="text-red-500">*</span>
-				</div>
-				<input
-					type="text"
-					id="selected-date"
-					value={wizardState.eventDate
-						? new Date(wizardState.eventDate).toLocaleDateString(undefined, {
-								weekday: 'long',
-								year: 'numeric',
-								month: 'long',
-								day: 'numeric'
-							})
-						: 'No date selected'}
-					readonly
-					class="mb-4 block w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-center text-sm font-medium text-gray-900 shadow-sm"
-				/>
-				<Calendar bind:value={wizardState.eventDate} min={today} />
-				{#if !wizardState.eventDate}
-					<p class="mt-2 text-sm text-gray-500">Please select a date from the calendar.</p>
-				{/if}
-			</div>
-		</div>
-	</div>
+	<EventInfoForm
+		initialData={{
+			eventName: wizardState.eventName,
+			eventDate: wizardState.eventDate,
+			eventOrganizer: wizardState.eventOrganizer,
+			ticketType: wizardState.ticketType
+		}}
+		onSubmit={handleSubmit}
+	/>
 
 	{#if isNavigating}
 		<div class="mt-6 text-center text-sm text-gray-600">Saving project...</div>

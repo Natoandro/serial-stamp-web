@@ -121,6 +121,17 @@ export interface SheetLayout {
 // Project
 // ============================================================================
 
+export interface EventInfo {
+	eventName: string;
+	eventDate: string;
+	eventOrganizer: string;
+	ticketType: string;
+}
+
+export interface ProjectSettings extends EventInfo {
+	templateImage: File | null;
+}
+
 export interface Project {
 	id: string;
 	eventName: string;

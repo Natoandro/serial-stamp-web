@@ -43,19 +43,29 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - Prefer composable, small components over large monolithic ones.
 - Use `<a>` tags with proper styling for navigation instead of buttons with `goto()` handlers.
 
-## 6) Code quality defaults
+## 6) Form component patterns
+
+- **Prefer uncontrolled forms**: Use native HTML forms with `FormData` on submit, avoiding `$state` for every field.
+- Forms expose `onSubmit` callbacks that receive typed data objects.
+- Use existing types from `src/lib/types.ts` instead of inline object types for props and callbacks.
+- Group related fields into typed objects (e.g., `EventInfo`, `ProjectSettings`) to minimize props.
+- Forms work as standard HTML forms with external submit buttons via `formId` prop.
+- Only use controlled inputs when specific constraints require real-time validation or interdependent fields.
+- Example: `<EventInfoForm initialData={eventInfo} onSubmit={handleSubmit} />` instead of multiple `bind:` props.
+
+## 7) Code quality defaults
 
 - Keep changes minimal and focused.
 - Prefer small, composable modules over one large file.
 - Maintain formatting/linting expectations (Prettier/ESLint).
 - Avoid introducing dependencies unless they clearly reduce complexity or are needed for correctness.
 
-## 7) Git operations
+## 8) Git operations
 
 - Always use "." as the `repo_path` parameter for all git operations.
 - Never use the full absolute path or the project name as repo_path.
 
-## 8) Safety & correctness
+## 9) Safety & correctness
 
 - Avoid destructive operations unless explicitly requested.
 - Validate assumptions; if key product behavior is ambiguous (e.g., coordinate system, DPI/print scaling, barcode formats), ask concise clarifying questions before implementing.

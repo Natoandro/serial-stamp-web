@@ -3,19 +3,13 @@
 	import { page } from '$app/state';
 	import { getContext, onMount } from 'svelte';
 	import { isValidUUID } from '$lib/utils/uuid';
-	import { v4 as uuidv4 } from 'uuid';
 	import type { WizardState } from '$lib/stores/wizard.svelte';
 	import { useProjectQuery, useUpdateProjectMutation } from '$lib/queries/projects.svelte';
-	import DataSourceList from '$lib/components/wizard/data-sources/DataSourceList.svelte';
-	import SequentialSourceForm from '$lib/components/wizard/data-sources/SequentialSourceForm.svelte';
-	import RandomSourceForm from '$lib/components/wizard/data-sources/RandomSourceForm.svelte';
-	import CsvSourceForm from '$lib/components/wizard/data-sources/CsvSourceForm.svelte';
-	import type { SequentialDataSource, RandomDataSource, CsvDataSource } from '$lib/types';
+	import DataSourcesForm from '$lib/components/forms/DataSourcesForm.svelte';
+	import type { DataSource } from '$lib/types';
 
 	const wizardState = getContext<WizardState>('wizardState');
 	const canProceedContext = getContext<{ value: boolean }>('canProceed');
-
-	let selectedType = $state<'sequential' | 'random' | 'csv'>('sequential');
 
 	const projectIdParam = page.url.searchParams.get('projectId');
 	let projectId = $state<string | null>(
@@ -49,7 +43,7 @@
 		canProceedContext.value = !isNavigating && !projectQuery.isLoading;
 	});
 
-	// Override the next button to save the project
+	// Override the next button to submit the form
 	const onFinishContext = getContext<{ value: (() => void | Promise<void>) | null }>('onFinish');
 
 	$effect(() => {
@@ -59,15 +53,24 @@
 		};
 	});
 
-	async function handleNext() {
+	function handleNext() {
+		// Trigger form submission
+		const form = document.getElementById('data-sources-form') as HTMLFormElement;
+		form?.requestSubmit();
+	}
+
+	async function handleSubmit(dataSources: DataSource[]) {
 		if (isNavigating || !projectId) return;
+
+		// Update wizard state
+		wizardState.dataSources = dataSources;
 
 		isNavigating = true;
 		try {
 			await updateMutation.mutateAsync({
 				id: projectId,
 				data: {
-					dataSources: wizardState.dataSources
+					dataSources
 				}
 			});
 
@@ -78,22 +81,6 @@
 		} finally {
 			isNavigating = false;
 		}
-	}
-
-	function handleAddSequential(source: Omit<SequentialDataSource, 'id'>) {
-		wizardState.dataSources = [...wizardState.dataSources, { ...source, id: uuidv4() }];
-	}
-
-	function handleAddRandom(source: Omit<RandomDataSource, 'id'>) {
-		wizardState.dataSources = [...wizardState.dataSources, { ...source, id: uuidv4() }];
-	}
-
-	function handleAddCsv(source: Omit<CsvDataSource, 'id'>) {
-		wizardState.dataSources = [...wizardState.dataSources, { ...source, id: uuidv4() }];
-	}
-
-	function handleRemoveSource(id: string) {
-		wizardState.dataSources = wizardState.dataSources.filter((s) => s.id !== id);
 	}
 </script>
 
@@ -116,51 +103,7 @@
 			</p>
 		</div>
 
-		<DataSourceList sources={wizardState.dataSources} onRemove={handleRemoveSource} />
-
-		<!-- Source Type Selector -->
-		<div class="mb-6">
-			<div class="block text-sm font-medium text-gray-700">Add Data Source</div>
-			<div class="mt-2 flex gap-2">
-				<button
-					type="button"
-					onclick={() => (selectedType = 'sequential')}
-					class="rounded-md px-4 py-2 text-sm font-medium transition-colors
-						{selectedType === 'sequential'
-						? 'bg-blue-600 text-white'
-						: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
-				>
-					Sequential
-				</button>
-				<button
-					type="button"
-					onclick={() => (selectedType = 'random')}
-					class="rounded-md px-4 py-2 text-sm font-medium transition-colors
-						{selectedType === 'random'
-						? 'bg-blue-600 text-white'
-						: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
-				>
-					Random
-				</button>
-				<button
-					type="button"
-					onclick={() => (selectedType = 'csv')}
-					class="rounded-md px-4 py-2 text-sm font-medium transition-colors
-						{selectedType === 'csv' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
-				>
-					CSV
-				</button>
-			</div>
-		</div>
-
-		<!-- Source Forms -->
-		{#if selectedType === 'sequential'}
-			<SequentialSourceForm onAdd={handleAddSequential} />
-		{:else if selectedType === 'random'}
-			<RandomSourceForm onAdd={handleAddRandom} />
-		{:else if selectedType === 'csv'}
-			<CsvSourceForm onAdd={handleAddCsv} />
-		{/if}
+		<DataSourcesForm initialData={wizardState.dataSources} onSubmit={handleSubmit} />
 
 		{#if isNavigating}
 			<div class="mt-6 text-center text-sm text-gray-600">Saving...</div>
