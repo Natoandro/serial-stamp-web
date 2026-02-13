@@ -1,12 +1,12 @@
 <script lang="ts">
 	import TextInput from '$lib/components/ui/forms/TextInput.svelte';
 	import Calendar from '$lib/components/ui/forms/Calendar.svelte';
-	import FileUpload from '$lib/components/ui/forms/FileUpload.svelte';
+	import ImageUpload from '$lib/components/ui/forms/ImageUpload.svelte';
 	import type { ProjectSettings } from '$lib/types';
 
 	interface Props {
 		initialData?: Partial<ProjectSettings>;
-		existingTemplateImage?: Blob | null;
+		currentTemplateImage?: Blob | null;
 		onSubmit: (data: ProjectSettings) => void | Promise<void>;
 		formId?: string;
 		requireImage?: boolean;
@@ -14,7 +14,7 @@
 
 	let {
 		initialData = {},
-		existingTemplateImage = null,
+		currentTemplateImage = null,
 		onSubmit,
 		formId = 'event-info-form',
 		requireImage = true
@@ -72,14 +72,12 @@
 				/>
 			</div>
 
-			<FileUpload
+			<ImageUpload
 				bind:file={templateImage}
-				existingImage={existingTemplateImage}
+				currentImage={currentTemplateImage}
 				label="Template Image"
 				hint="Upload an image that will serve as the base template for your tickets."
-				accept="image/*"
 				required={requireImage}
-				showPreview
 			/>
 		</div>
 

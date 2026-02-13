@@ -17,15 +17,15 @@
 	const project = $derived(query.data);
 
 	// Tab state
-	const tabParam = page.url.searchParams.get('tab');
-	let activeTab = $state<'event' | 'data'>(tabParam === 'data' ? 'data' : 'event');
+	const activeTab = $derived<'event' | 'data'>(
+		page.url.searchParams.get('tab') === 'data' ? 'data' : 'event'
+	);
 
 	let isSaving = $state(false);
 	let eventFormRef: EventInfoForm;
 	let dataFormRef: DataSourcesForm;
 
 	function switchTab(tab: 'event' | 'data') {
-		activeTab = tab;
 		const url = new URL(page.url);
 		url.searchParams.set('tab', tab);
 		void goto(url.toString(), { replaceState: true });
@@ -188,7 +188,7 @@
 								eventOrganizer: project.eventOrganizer,
 								ticketType: project.ticketType
 							}}
-							existingTemplateImage={project.templateImage}
+							currentTemplateImage={project.templateImage}
 							requireImage={false}
 							onSubmit={handleEventInfoSubmit}
 						/>
