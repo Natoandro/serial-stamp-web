@@ -120,7 +120,7 @@
 					</div>
 				</div>
 				<div class="flex items-center gap-3">
-					<Button variant="secondary" onclick={handleCancel}>Cancel</Button>
+					<!-- Cancel button removed - back button serves same purpose -->
 				</div>
 			</div>
 		</div>

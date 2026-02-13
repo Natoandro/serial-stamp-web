@@ -25,7 +25,7 @@
 		onDirtyChange
 	}: Props = $props();
 
-	const today = new Date().toISOString().split('T')[0];
+	const today = new Date().toLocaleDateString('en-CA');
 
 	// Create form with TanStack
 	const form = createForm(() => ({
