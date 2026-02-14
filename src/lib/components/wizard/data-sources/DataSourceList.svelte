@@ -30,8 +30,9 @@
 	function getSourceLabel(source: DataSource): string {
 		switch (source.type) {
 			case 'sequential':
-				const paddingText = source.padLength > 0 ? `, pad ${source.padLength}` : '';
-				return `${source.prefix || ''}${source.start}-${source.end} (step ${source.step}${paddingText})`;
+				const start = source.start.toString().padStart(source.padLength, '0');
+				const end = source.end.toString().padStart(source.padLength, '0');
+				return `${source.prefix || ''}${start} – ${end} (step ${source.step})`;
 			case 'random':
 				return `${source.count} strings (length ${source.length})`;
 			case 'csv':

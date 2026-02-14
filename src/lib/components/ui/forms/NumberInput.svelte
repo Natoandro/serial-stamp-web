@@ -3,6 +3,7 @@
 
 	interface Props {
 		id?: string;
+		name?: string;
 		value?: number;
 		min?: number;
 		max?: number;
@@ -14,10 +15,13 @@
 		label?: string;
 		hint?: string;
 		error?: string;
+		oninput?: (value: number) => void;
+		onblur?: () => void;
 	}
 
 	let {
 		id,
+		name,
 		value = $bindable(0),
 		min,
 		max,
@@ -29,6 +33,8 @@
 		label,
 		hint,
 		error,
+		oninput,
+		onblur,
 		...props
 	}: Props = $props();
 
@@ -49,13 +55,28 @@
 	<input
 		type="number"
 		id={inputId}
-		bind:value
+		{name}
+		{value}
 		{min}
 		{max}
 		{step}
 		{placeholder}
 		{required}
 		{disabled}
+		oninput={(e) => {
+			const target = e.target as HTMLInputElement;
+			const newValue = target.value === '' ? 0 : Number(target.value);
+			if (oninput) {
+				oninput(newValue);
+			} else {
+				value = newValue;
+			}
+		}}
+		onblur={() => {
+			if (onblur) {
+				onblur();
+			}
+		}}
 		class={cn(
 			'block w-full rounded-md border px-3 py-2 shadow-sm transition-colors',
 			'focus:ring-1 focus:outline-none',

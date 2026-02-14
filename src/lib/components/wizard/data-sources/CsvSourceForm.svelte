@@ -1,16 +1,63 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
+	import { createForm } from '@tanstack/svelte-form';
+	import { z } from 'zod';
+	import { getFieldError } from '$lib/utils/form';
+	import TextInput from '$lib/components/ui/forms/TextInput.svelte';
+	import Button from '$lib/components/ui/Button.svelte';
 	import type { CsvDataSource } from '$lib/types';
 
 	interface Props {
-		onAdd: (source: Omit<CsvDataSource, 'id'>) => void;
+		initialData?: CsvDataSource;
+		onAdd?: (source: Omit<CsvDataSource, 'id'>) => void;
+		onUpdate?: (source: CsvDataSource) => void;
 	}
 
-	let { onAdd }: Props = $props();
+	let { initialData, onAdd, onUpdate }: Props = $props();
 
-	let name = $state('');
-	let columns = $state<string[]>([]);
-	let rows = $state<Record<string, string>[]>([]);
-	let error = $state<string | null>(null);
+	let fileError = $state<string | null>(null);
+
+	const form = createForm(() => ({
+		defaultValues: {
+			name: initialData?.name ?? '',
+			columns: (initialData?.columns ?? []) as string[],
+			rows: (initialData?.rows ?? []) as Record<string, string>[]
+		},
+		onSubmit: async ({ value }) => {
+			if (value.columns.length === 0 || value.rows.length === 0) {
+				fileError = 'Please upload a CSV file first.';
+				return;
+			}
+
+			const sourceData = {
+				type: 'csv' as const,
+				name: value.name.trim() || 'csv',
+				columns: value.columns,
+				rows: value.rows
+			};
+
+			if (initialData && onUpdate) {
+				onUpdate({ ...sourceData, id: initialData.id });
+			} else if (onAdd) {
+				onAdd(sourceData);
+			}
+		}
+	}));
+
+	// Sync form state if initialData changes reactively
+	$effect(() => {
+		if (initialData) {
+			const values = {
+				name: initialData.name,
+				columns: initialData.columns,
+				rows: initialData.rows
+			};
+
+			untrack(() => {
+				form.reset(values);
+			});
+		}
+	});
 
 	async function handleFileUpload(event: Event) {
 		const input = event.target as HTMLInputElement;
@@ -18,14 +65,14 @@
 
 		if (!file) return;
 
-		error = null;
+		fileError = null;
 
 		try {
 			const text = await file.text();
 			const lines = text.split('\n').filter((line) => line.trim());
 
 			if (lines.length < 2) {
-				error = 'CSV file must contain at least a header and one data row.';
+				fileError = 'CSV file must contain at least a header and one data row.';
 				return;
 			}
 
@@ -37,53 +84,53 @@
 				const values = lines[i].split(',').map((v) => v.trim());
 				const row: Record<string, string> = {};
 				headers.forEach((header, index) => {
-					row[header] = values[index] || '';
+					if (headers[index]) {
+						row[headers[index]] = values[index] || '';
+					}
 				});
 				parsedRows.push(row);
 			}
 
-			columns = headers;
-			rows = parsedRows;
-		} catch {
-			error = 'Failed to parse CSV file.';
+			form.setFieldValue('columns', headers);
+			form.setFieldValue('rows', parsedRows);
+		} catch (err) {
+			console.error('CSV parse error:', err);
+			fileError = 'Failed to parse CSV file.';
 		}
-	}
-
-	function handleAdd() {
-		if (columns.length === 0 || rows.length === 0) return;
-
-		onAdd({
-			type: 'csv',
-			name: name.trim() || 'csv',
-			columns,
-			rows
-		});
-
-		// Reset form
-		name = '';
-		columns = [];
-		rows = [];
-		error = null;
 	}
 </script>
 
-<div class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-	<div>
-		<label for="csv-name" class="mb-1 block text-sm font-medium text-gray-700">Source Name</label>
-		<input
-			type="text"
-			id="csv-name"
-			bind:value={name}
-			placeholder="e.g., attendees"
-			class="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-		/>
-		<p class="mt-1 text-xs text-gray-500">
-			Used in templates as {'{{name.field}}'}. Defaults to 'csv' if empty.
-		</p>
-	</div>
+<form
+	onsubmit={(e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		form.handleSubmit();
+	}}
+	class="space-y-4"
+>
+	<form.Field
+		name="name"
+		validators={{
+			onChange: z.string().min(1, 'Source name is required')
+		}}
+	>
+		{#snippet children(field)}
+			<TextInput
+				name={field.name}
+				value={field.state.value}
+				oninput={(val) => field.handleChange(val)}
+				onblur={field.handleBlur}
+				label="Source Name"
+				placeholder="e.g., attendees"
+				hint="Used in templates as {'{{name.field}}'}"
+				required
+				error={getFieldError(field)}
+			/>
+		{/snippet}
+	</form.Field>
 
-	<div>
-		<label for="csv-file" class="mb-1 block text-sm font-medium text-gray-700">CSV File</label>
+	<div class="space-y-1">
+		<label for="csv-file" class="block text-sm font-medium text-gray-700">CSV File</label>
 		<input
 			type="file"
 			id="csv-file"
@@ -91,48 +138,57 @@
 			onchange={handleFileUpload}
 			class="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
 		/>
-		<p class="mt-1 text-xs text-gray-500">Upload a CSV file with headers.</p>
+		<p class="text-xs text-gray-500">
+			{initialData
+				? 'Optionally upload a new CSV file to replace data.'
+				: 'Upload a CSV file with headers.'}
+		</p>
 	</div>
 
-	{#if error}
+	{#if fileError}
 		<div class="rounded-md bg-red-50 p-3">
-			<p class="text-sm text-red-800">{error}</p>
+			<p class="text-sm text-red-800">{fileError}</p>
 		</div>
 	{/if}
 
-	{#if columns.length > 0}
-		<div>
-			<p class="text-sm font-medium text-gray-700">Preview ({rows.length} rows)</p>
-			<div class="mt-2 max-h-48 overflow-auto rounded-md border border-gray-300">
-				<table class="min-w-full divide-y divide-gray-200 text-sm">
-					<thead class="bg-gray-100">
-						<tr>
-							{#each columns as column (column)}
-								<th class="px-3 py-2 text-left font-medium text-gray-700">{column}</th>
-							{/each}
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-gray-200 bg-white">
-						{#each rows.slice(0, 5) as row, rowIndex (rowIndex)}
-							<tr>
-								{#each columns as column (column)}
-									<td class="px-3 py-2 text-gray-900">{row[column]}</td>
+	<form.Subscribe
+		selector={(state) => ({ columns: state.values.columns, rows: state.values.rows })}
+	>
+		{#snippet children(state)}
+			{#if state.columns.length > 0}
+				<div class="space-y-2">
+					<p class="text-sm font-medium text-gray-700">Preview ({state.rows.length} rows)</p>
+					<div class="max-h-48 overflow-auto rounded-md border border-gray-200 shadow-sm">
+						<table class="min-w-full divide-y divide-gray-200 text-sm">
+							<thead class="bg-gray-50">
+								<tr>
+									{#each state.columns as column (column)}
+										<th class="px-3 py-2 text-left font-medium text-gray-600">{column}</th>
+									{/each}
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-gray-100 bg-white">
+								{#each state.rows.slice(0, 5) as row, rowIndex (rowIndex)}
+									<tr>
+										{#each state.columns as column (column)}
+											<td class="px-3 py-2 whitespace-nowrap text-gray-600">{row[column]}</td>
+										{/each}
+									</tr>
 								{/each}
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-			{#if rows.length > 5}
-				<p class="mt-1 text-xs text-gray-500">Showing first 5 rows of {rows.length}</p>
+							</tbody>
+						</table>
+					</div>
+					{#if state.rows.length > 5}
+						<p class="text-xs text-gray-400 italic">Showing first 5 rows of {state.rows.length}</p>
+					{/if}
+				</div>
 			{/if}
-		</div>
-		<button
-			type="button"
-			onclick={handleAdd}
-			class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-		>
-			Add CSV Source
-		</button>
-	{/if}
-</div>
+		{/snippet}
+	</form.Subscribe>
+
+	<div class="pt-4">
+		<Button type="submit" class="w-full">
+			{initialData ? 'Update CSV Source' : 'Add CSV Source'}
+		</Button>
+	</div>
+</form>

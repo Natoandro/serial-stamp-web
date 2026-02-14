@@ -40,18 +40,19 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - Always extract reusable UI elements into dedicated components.
 - SVG icons must be in their own components (e.g., `IconTrash.svelte`, `IconPlus.svelte`).
 - Build a consistent component library under `src/lib/components/ui/` for buttons, inputs, modals, etc.
+- **Use Svelte snippets** for repetitive UI patterns within a component (e.g., similar buttons, list items).
 - Prefer composable, small components over large monolithic ones.
 - Use `<a>` tags with proper styling for navigation instead of buttons with `goto()` handlers.
 
 ## 6) Form component patterns
 
-- **Prefer uncontrolled forms**: Use native HTML forms with `FormData` on submit, avoiding `$state` for every field.
-- Forms expose `onSubmit` callbacks that receive typed data objects.
-- Use existing types from `src/lib/types.ts` instead of inline object types for props and callbacks.
-- Group related fields into typed objects (e.g., `EventInfo`, `ProjectSettings`) to minimize props.
-- Forms work as standard HTML forms with external submit buttons via `formId` prop.
-- Only use controlled inputs when specific constraints require real-time validation or interdependent fields.
-- Example: `<EventInfoForm initialData={eventInfo} onSubmit={handleSubmit} />` instead of multiple `bind:` props.
+- **Prefer TanStack Form**: Use `@tanstack/svelte-form` for all forms to ensure consistent state, validation (Zod), and dirty tracking.
+- Forms must use native `<form>` tags with a proper submit button to ensure "Enter to submit" works.
+- Handle form submission via `onsubmit={(e) => { e.preventDefault(); e.stopPropagation(); form.handleSubmit(); }}`.
+- Use existing types from `src/lib/types.ts` for form values and callbacks.
+- Forms expose `onDirtyChange` callbacks to notify parents of state changes.
+- Use `getFieldError(field)` utility for consistent error rendering.
+- Avoid inline editing for complex objects; prefer dedicated forms in modals.
 
 ## 7) Code quality defaults
 

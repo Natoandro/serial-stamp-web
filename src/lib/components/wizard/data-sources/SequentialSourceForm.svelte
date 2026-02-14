@@ -1,88 +1,187 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
+	import { createForm } from '@tanstack/svelte-form';
+	import { z } from 'zod';
+	import { getFieldError } from '$lib/utils/form';
 	import TextInput from '$lib/components/ui/forms/TextInput.svelte';
 	import NumberInput from '$lib/components/ui/forms/NumberInput.svelte';
+	import Button from '$lib/components/ui/Button.svelte';
 	import type { SequentialDataSource } from '$lib/types';
 
 	interface Props {
-		onAdd: (source: Omit<SequentialDataSource, 'id'>) => void;
+		initialData?: SequentialDataSource;
+		onAdd?: (source: Omit<SequentialDataSource, 'id'>) => void;
+		onUpdate?: (source: SequentialDataSource) => void;
 	}
 
-	let { onAdd }: Props = $props();
+	let { initialData, onAdd, onUpdate }: Props = $props();
 
-	let name = $state('');
-	let prefix = $state('');
-	let start = $state(1);
-	let end = $state(100);
-	let step = $state(1);
-	let padLength = $state(0);
+	const form = createForm(() => ({
+		defaultValues: {
+			name: initialData?.name ?? '',
+			prefix: initialData?.prefix ?? '',
+			start: initialData?.start ?? 1,
+			end: initialData?.end ?? 100,
+			step: initialData?.step ?? 1,
+			padLength: initialData?.padLength ?? 0
+		},
+		onSubmit: async ({ value }) => {
+			const sourceData = {
+				type: 'sequential' as const,
+				name: value.name.trim() || 'number',
+				prefix: value.prefix || undefined,
+				start: value.start,
+				end: value.end,
+				step: value.step,
+				padLength: value.padLength
+			};
 
-	function handleAdd() {
-		onAdd({
-			type: 'sequential',
-			name: name.trim() || 'number',
-			prefix: prefix || undefined,
-			start,
-			end,
-			step,
-			padLength
-		});
+			if (initialData && onUpdate) {
+				onUpdate({ ...sourceData, id: initialData.id });
+			} else if (onAdd) {
+				onAdd(sourceData);
+			}
+		}
+	}));
 
-		// Reset form
-		name = '';
-		prefix = '';
-		start = 1;
-		end = 100;
-		step = 1;
-		padLength = 0;
-	}
+	// Sync form state if initialData changes reactively
+	$effect(() => {
+		if (initialData) {
+			const values = {
+				name: initialData.name,
+				prefix: initialData.prefix ?? '',
+				start: initialData.start,
+				end: initialData.end,
+				step: initialData.step,
+				padLength: initialData.padLength
+			};
+
+			untrack(() => {
+				form.reset(values);
+			});
+		}
+	});
 </script>
 
-<div class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-	<TextInput
-		bind:value={name}
-		label="Variable Name"
-		placeholder="e.g., ticket_no"
-		hint="Used in templates as {'{{name}}'}. Defaults to 'number' if empty."
-		required
-	/>
-
-	<div class="grid grid-cols-2 gap-4">
-		<NumberInput bind:value={start} label="Start Number" placeholder="1" required />
-
-		<NumberInput bind:value={end} label="End Number" placeholder="100" required />
-	</div>
-
-	<div class="grid grid-cols-2 gap-4">
-		<NumberInput
-			bind:value={step}
-			label="Step"
-			placeholder="1"
-			hint="Increment by this value"
-			min={1}
-			required
-		/>
-
-		<NumberInput
-			bind:value={padLength}
-			label="Padding Length"
-			placeholder="0"
-			hint="0 = no padding, 3 = 001"
-			min={0}
-		/>
-	</div>
-
-	<TextInput
-		bind:value={prefix}
-		label="Prefix (optional)"
-		placeholder="e.g., TICKET-"
-		hint="Text to prepend to each number"
-	/>
-
-	<button
-		type="button"
-		onclick={handleAdd}
-		class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+<form
+	onsubmit={(e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		form.handleSubmit();
+	}}
+	class="space-y-4"
+>
+	<form.Field
+		name="name"
+		validators={{
+			onChange: z.string().min(1, 'Variable name is required')
+		}}
 	>
-		Add Sequential Source
-	</button>
-</div>
+		{#snippet children(field)}
+			<TextInput
+				name={field.name}
+				value={field.state.value}
+				oninput={(val) => field.handleChange(val)}
+				onblur={field.handleBlur}
+				label="Variable Name"
+				placeholder="e.g., ticket_no"
+				hint="Used in templates as {'{{name}}'}"
+				required
+				error={getFieldError(field)}
+			/>
+		{/snippet}
+	</form.Field>
+
+	<div class="grid grid-cols-2 gap-4">
+		<form.Field name="start">
+			{#snippet children(field)}
+				<NumberInput
+					name={field.name}
+					value={field.state.value}
+					oninput={(val) => field.handleChange(val)}
+					onblur={field.handleBlur}
+					label="Start Number"
+					required
+					error={getFieldError(field)}
+				/>
+			{/snippet}
+		</form.Field>
+
+		<form.Field name="end">
+			{#snippet children(field)}
+				<NumberInput
+					name={field.name}
+					value={field.state.value}
+					oninput={(val) => field.handleChange(val)}
+					onblur={field.handleBlur}
+					label="End Number"
+					required
+					error={getFieldError(field)}
+				/>
+			{/snippet}
+		</form.Field>
+	</div>
+
+	<div class="grid grid-cols-2 gap-4">
+		<form.Field
+			name="step"
+			validators={{
+				onChange: z.number().min(1, 'Step must be at least 1')
+			}}
+		>
+			{#snippet children(field)}
+				<NumberInput
+					name={field.name}
+					value={field.state.value}
+					oninput={(val) => field.handleChange(val)}
+					onblur={field.handleBlur}
+					label="Step"
+					min={1}
+					required
+					error={getFieldError(field)}
+				/>
+			{/snippet}
+		</form.Field>
+
+		<form.Field
+			name="padLength"
+			validators={{
+				onChange: z.number().min(0, 'Padding cannot be negative')
+			}}
+		>
+			{#snippet children(field)}
+				<NumberInput
+					name={field.name}
+					value={field.state.value}
+					oninput={(val) => field.handleChange(val)}
+					onblur={field.handleBlur}
+					label="Padding Length"
+					hint="0 = none, 3 = 001"
+					min={0}
+					error={getFieldError(field)}
+				/>
+			{/snippet}
+		</form.Field>
+	</div>
+
+	<form.Field name="prefix">
+		{#snippet children(field)}
+			<TextInput
+				name={field.name}
+				value={field.state.value}
+				oninput={(val) => field.handleChange(val)}
+				onblur={field.handleBlur}
+				label="Prefix (optional)"
+				placeholder="e.g., TICKET-"
+				hint="Text to prepend to each number"
+				error={getFieldError(field)}
+			/>
+		{/snippet}
+	</form.Field>
+
+	<div class="pt-2">
+		<Button type="submit" class="w-full">
+			{initialData ? 'Update Sequential Source' : 'Add Sequential Source'}
+		</Button>
+	</div>
+</form>

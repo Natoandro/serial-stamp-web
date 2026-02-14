@@ -216,12 +216,6 @@
 							onDirtyChange={(dirty) => (isFormDirty = dirty)}
 						/>
 					{:else if activeTab === 'data'}
-						<div class="mb-6">
-							<h2 class="text-lg font-semibold text-gray-900">Data Sources</h2>
-							<p class="mt-1 text-sm text-gray-600">
-								Manage data sources that populate your stamps.
-							</p>
-						</div>
 						<DataSourcesForm
 							bind:this={dataFormRef}
 							initialData={project.dataSources}

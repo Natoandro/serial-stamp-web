@@ -13,7 +13,7 @@
 		onClose?: () => void;
 	} = $props();
 
-	function handleBackdropClick() {
+	function handleClose() {
 		if (onClose) {
 			onClose();
 		} else {
@@ -22,6 +22,8 @@
 	}
 </script>
 
+<svelte:window onkeydown={(e) => e.key === 'Escape' && open && handleClose()} />
+
 {#if open}
 	<div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
 		<div
@@ -29,8 +31,8 @@
 		>
 			<button
 				type="button"
-				class="bg-opacity-75 fixed inset-0 bg-gray-500 transition-opacity"
-				onclick={handleBackdropClick}
+				class="fixed inset-0 bg-black/10 backdrop-blur-sm transition-opacity"
+				onclick={handleClose}
 				aria-label="Close modal"
 			></button>
 
