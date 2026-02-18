@@ -11,8 +11,7 @@
 	const wizardState = getContext<WizardState>('wizardState');
 	const canProceedContext = getContext<{ value: boolean }>('canProceed');
 
-	let dataFormRef: DataSourcesForm;
-	let currentDataSources = $state<DataSource[]>([]);
+	let dataFormRef = $state<DataSourcesForm>();
 
 	const projectIdParam = page.url.searchParams.get('projectId');
 	let projectId = $state<string | null>(
@@ -83,8 +82,7 @@
 	}
 
 	function handleDataSourcesChange(dataSources: DataSource[]) {
-		// Just update local state, don't save until Next is clicked
-		currentDataSources = dataSources;
+		// Just update wizard state, don't save until Next is clicked
 		wizardState.dataSources = dataSources;
 	}
 </script>

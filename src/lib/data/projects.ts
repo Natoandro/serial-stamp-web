@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Project } from '$lib/types';
 
 // Deep clone and sanitize data for IndexedDB
-function sanitizeForIndexedDB(data: any): any {
+function sanitizeForIndexedDB(data: unknown): unknown {
 	if (data === null || data === undefined) {
 		return data;
 	}
@@ -29,10 +29,10 @@ function sanitizeForIndexedDB(data: any): any {
 
 	// Handle plain objects
 	if (typeof data === 'object') {
-		const sanitized: any = {};
+		const sanitized: Record<string, unknown> = {};
 		for (const key in data) {
 			if (Object.prototype.hasOwnProperty.call(data, key)) {
-				sanitized[key] = sanitizeForIndexedDB(data[key]);
+				sanitized[key] = sanitizeForIndexedDB((data as Record<string, unknown>)[key]);
 			}
 		}
 		return sanitized;

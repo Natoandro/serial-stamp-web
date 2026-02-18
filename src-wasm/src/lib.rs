@@ -1,6 +1,5 @@
-use printpdf::*;
+use image::{ImageBuffer, RgbaImage, Rgba};
 use serde::Deserialize;
-use std::io::Cursor;
 use wasm_bindgen::prelude::*;
 
 #[derive(Deserialize)]
@@ -18,7 +17,7 @@ pub struct SheetConfig {
 }
 
 #[wasm_bindgen]
-pub fn generate_pdf(
+pub fn generate_preview_png(
     config_json: &str,
     image_data: &[u8],
     ticket_width_px: u32,
@@ -31,32 +30,26 @@ pub fn generate_pdf(
         return Err(JsValue::from_str("Invalid ticket dimensions (zero)"));
     }
 
-    let (doc, page1, layer1) = PdfDocument::new(
-        "Serial Stamp Export",
-        Mm(config.paper_width_mm),
-        Mm(config.paper_height_mm),
-        "Layer 1",
-    );
-
-    let mut current_page = page1;
-    let mut current_layer = doc.get_page(current_page).get_layer(layer1);
-
     let tickets_per_page = config.rows * config.cols;
     if tickets_per_page == 0 {
         return Err(JsValue::from_str("Invalid grid layout (zero rows or columns)"));
     }
 
-    // Calculate ticket dimensions in Mm
-    let total_spacing_x = (config.cols as f64 - 1.0).max(0.0) * config.spacing_x_mm;
-    let available_width =
-        config.paper_width_mm - config.margin_left_mm - config.margin_right_mm - total_spacing_x;
-    let ticket_width_mm = available_width / config.cols as f64;
+    // Assume 300 DPI for preview
+    let dpi = 300.0;
+    let mm_per_inch = 25.4;
+    let pixels_per_mm = dpi / mm_per_inch;
 
-    let total_spacing_y = (config.rows as f64 - 1.0).max(0.0) * config.spacing_y_mm;
-    let available_height =
-        config.paper_height_mm - config.margin_top_mm - config.margin_bottom_mm - total_spacing_y;
-    let ticket_height_mm = available_height / config.rows as f64;
+    let page_width_px = (config.paper_width_mm * pixels_per_mm) as u32;
+    let page_height_px = (config.paper_height_mm * pixels_per_mm) as u32;
 
+    // Create a white background image (exact paper size)
+    let mut img: RgbaImage = ImageBuffer::new(page_width_px, page_height_px);
+    for pixel in img.pixels_mut() {
+        *pixel = Rgba([255, 255, 255, 255]);
+    }
+
+    // Use actual ticket dimensions passed from JS - no recalculation or scaling
     let bytes_per_ticket = (ticket_width_px * ticket_height_px * 4) as usize;
     let total_tickets = image_data.len() / bytes_per_ticket;
 
@@ -64,75 +57,65 @@ pub fn generate_pdf(
         return Err(JsValue::from_str("No ticket images provided"));
     }
 
-    for i in 0..total_tickets {
-        let pos_in_page = i % tickets_per_page;
+    // Convert margins and spacing to pixels
+    let margin_left_px = (config.margin_left_mm * pixels_per_mm) as u32;
+    let margin_top_px = (config.margin_top_mm * pixels_per_mm) as u32;
+    let spacing_x_px = (config.spacing_x_mm * pixels_per_mm) as u32;
+    let spacing_y_px = (config.spacing_y_mm * pixels_per_mm) as u32;
 
-        if i > 0 && pos_in_page == 0 {
-            let (new_page, new_layer) = doc.add_page(
-                Mm(config.paper_width_mm),
-                Mm(config.paper_height_mm),
-                "Layer 1",
-            );
-            current_page = new_page;
-            current_layer = doc.get_page(current_page).get_layer(new_layer);
-        }
+    // Only render the first page
+    let tickets_to_render = total_tickets.min(tickets_per_page);
 
-        let row = pos_in_page / config.cols;
-        let col = pos_in_page % config.cols;
+    for i in 0..tickets_to_render {
+        let row = i / config.cols;
+        let col = i % config.cols;
 
-        let x = config.margin_left_mm + col as f64 * (ticket_width_mm + config.spacing_x_mm);
-        // printpdf uses bottom-left origin. y is distance from bottom.
-        let y = config.paper_height_mm
-            - config.margin_top_mm
-            - (row as f64 + 1.0) * ticket_height_mm
-            - (row as f64 * config.spacing_y_mm);
+        // Calculate position using actual ticket pixel dimensions and spacing
+        let x_px = margin_left_px + col as u32 * (ticket_width_px + spacing_x_px);
+        let y_px = margin_top_px + row as u32 * (ticket_height_px + spacing_y_px);
 
         let start = i * bytes_per_ticket;
         let end = start + bytes_per_ticket;
         let ticket_pixels = &image_data[start..end];
 
-        // Convert RGBA to RGB (dropping alpha channel)
-        let mut rgb_pixels = Vec::with_capacity((ticket_width_px * ticket_height_px * 3) as usize);
-        for chunk in ticket_pixels.chunks(4) {
-            if chunk.len() >= 3 {
-                rgb_pixels.push(chunk[0]);
-                rgb_pixels.push(chunk[1]);
-                rgb_pixels.push(chunk[2]);
+        // Composite the ticket image onto the page (no scaling - tickets are pre-rendered)
+        for ty in 0..ticket_height_px {
+            for tx in 0..ticket_width_px {
+                let src_idx = ((ty * ticket_width_px + tx) * 4) as usize;
+                if src_idx + 3 >= ticket_pixels.len() {
+                    continue;
+                }
+
+                let r = ticket_pixels[src_idx];
+                let g = ticket_pixels[src_idx + 1];
+                let b = ticket_pixels[src_idx + 2];
+                let a = ticket_pixels[src_idx + 3];
+
+                let final_x = x_px + tx;
+                let final_y = y_px + ty;
+
+                if final_x >= page_width_px || final_y >= page_height_px {
+                    continue;
+                }
+
+                // Simple alpha blending
+                let bg_pixel = img.get_pixel(final_x, final_y);
+                let alpha = a as f32 / 255.0;
+                let inv_alpha = 1.0 - alpha;
+
+                let new_r = (r as f32 * alpha + bg_pixel[0] as f32 * inv_alpha) as u8;
+                let new_g = (g as f32 * alpha + bg_pixel[1] as f32 * inv_alpha) as u8;
+                let new_b = (b as f32 * alpha + bg_pixel[2] as f32 * inv_alpha) as u8;
+
+                img.put_pixel(final_x, final_y, Rgba([new_r, new_g, new_b, 255]));
             }
         }
-
-        let image = Image {
-            width: Px(ticket_width_px as usize),
-            height: Px(ticket_height_px as usize),
-            color_space: ColorSpace::Rgb,
-            bits_per_component: ColorBits::Bit8,
-            image_data: rgb_pixels,
-        };
-
-        // Scale factors: points per pixel.
-        // PDF default coordinate system is 72 DPI (points).
-        let target_width_pts = ticket_width_mm * (72.0 / 25.4);
-        let target_height_pts = ticket_height_mm * (72.0 / 25.4);
-        let scale_x = target_width_pts / ticket_width_px as f64;
-        let scale_y = target_height_pts / ticket_height_px as f64;
-
-        image.add_to_layer(
-            current_layer.clone(),
-            ImageTransform {
-                translate_x: Some(Mm(x)),
-                translate_y: Some(Mm(y)),
-                rotate: None,
-                scale_x: Some(scale_x),
-                scale_y: Some(scale_y),
-                dpi: None,
-            },
-        );
     }
 
-    let mut pdf_bytes = Vec::new();
-    let mut writer = Cursor::new(&mut pdf_bytes);
-    doc.save(&mut writer)
-        .map_err(|e| JsValue::from_str(&format!("Failed to save PDF: {}", e)))?;
+    // Encode to PNG
+    let mut png_bytes = Vec::new();
+    img.write_to(&mut std::io::Cursor::new(&mut png_bytes), image::ImageFormat::Png)
+        .map_err(|e| JsValue::from_str(&format!("Failed to encode PNG: {}", e)))?;
 
-    Ok(pdf_bytes)
+    Ok(png_bytes)
 }

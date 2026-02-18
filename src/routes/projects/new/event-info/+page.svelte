@@ -53,7 +53,7 @@
 		try {
 			if (projectId) {
 				// Update existing project
-				const updateData: any = {
+				const updateData: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>> = {
 					eventName: data.eventName,
 					eventDate: data.eventDate,
 					eventOrganizer: data.eventOrganizer,

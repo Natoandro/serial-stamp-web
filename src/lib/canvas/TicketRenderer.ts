@@ -4,7 +4,7 @@ import { generateBarcode } from '$lib/services/barcode';
 import { generateQrCode } from '$lib/services/qrcode';
 
 export interface TicketRendererOptions {
-	ctx: CanvasRenderingContext2D;
+	ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 	templateImage: ImageBitmap | HTMLImageElement;
 	stamps: Stamp[];
 	dataSources: DataSource[];
@@ -12,7 +12,7 @@ export interface TicketRendererOptions {
 }
 
 export class TicketRenderer {
-	private ctx: CanvasRenderingContext2D;
+	private ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 	private templateImage: ImageBitmap | HTMLImageElement;
 	private stamps: Stamp[];
 	private dataSources: DataSource[];

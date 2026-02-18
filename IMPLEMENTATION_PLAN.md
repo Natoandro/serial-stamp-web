@@ -683,28 +683,27 @@ export async function parseCsv(file: File): Promise<CsvDataSource> {
 
 - Update `project.sheetLayout` in IndexedDB.
 
-### 5.2 — Sheet Preview Canvas
+### 5.2 — Sheet Preview (WASM PNG)
 
 Create `src/lib/components/editor/SheetPreview.svelte`:
 
 **Features**:
 
-- Render full sheet at scaled-down size (fit to screen).
-- Draw:
-  1. Paper outline (border).
-  2. Margins (light gray background or guides).
-  3. Grid of tickets (each cell renders using `TicketRenderer`).
-  4. Spacing between tickets (visual guides/grid lines).
+- Generate high-DPI PNG of the first sheet page using WASM.
+- Render tickets individually using `TicketRenderer`, composite into sheet layout.
+- Display PNG image scaled to fit screen.
+- Show loading state during generation.
 
 **Data Mapping**:
 
-- Map data records to cells sequentially (left-to-right, top-to-bottom).
-- Total tickets per sheet: `rows * cols`.
-- If `records.length > rows * cols`, support multi-page preview (pagination controls).
+- Generate data records from project data sources.
+- Render first `rows * cols` records as tickets.
+- Composite tickets onto white page background with proper margins and spacing.
 
-**Zoom/Pan** (optional):
+**Performance**:
 
-- Allow zooming in/out and panning for large sheets.
+- Uses OffscreenCanvas for ticket rendering.
+- WASM handles final compositing and PNG encoding for accuracy and speed.
 
 ### 5.3 — Sheet Data Mapping
 

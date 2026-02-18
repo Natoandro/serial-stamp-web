@@ -70,3 +70,22 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 
 - Avoid destructive operations unless explicitly requested.
 - Validate assumptions; if key product behavior is ambiguous (e.g., coordinate system, DPI/print scaling, barcode formats), ask concise clarifying questions before implementing.
+
+## 10) WASM development
+
+- WASM code lives in `src-wasm/` (Rust crate).
+- After editing Rust code, run `cd src-wasm && cargo check` to verify compilation before building WASM.
+- Build WASM with `pnpm run build:wasm` (uses wasm-pack).
+- WASM output goes to `src/lib/wasm/` (generated files).
+- Always initialize WASM modules before use: `const { func, default: init } = await import('$lib/wasm/module'); await init();`
+- For image processing in WASM, use the `image` crate with PNG/JPEG features enabled.
+- Keep WASM functions focused and simple; handle complex orchestration in TypeScript.
+
+## 11) Scaling discipline (CRITICAL)
+
+- **UNIFORM SCALING ONLY**: All image/ticket scaling MUST use the same factor for both X and Y axes.
+- Use `Math.min(scaleX, scaleY)` to maintain aspect ratio without distortion.
+- Never scale X and Y independently—this causes visual distortion.
+- When user sets margins to 0, the actual margin in the output MUST be 0 (no automatic padding unless explicitly documented).
+- In WASM/Rust code, only add visual margins (like the 10mm preview border) if they are clearly for preview purposes, not part of the actual document layout.
+- Template images must be scaled isotropically to fit target dimensions calculated from mm measurements.

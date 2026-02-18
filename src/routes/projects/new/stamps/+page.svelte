@@ -3,7 +3,6 @@
 	import { page } from '$app/state';
 	import { getContext, onMount } from 'svelte';
 	import { isValidUUID } from '$lib/utils/uuid';
-	import type { WizardState } from '$lib/stores/wizard.svelte';
 	import { wizardState } from '$lib/stores/wizard.svelte';
 	import { useProjectQuery } from '$lib/queries/projects.svelte';
 
