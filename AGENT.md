@@ -55,6 +55,7 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - Avoid inline editing for complex objects; prefer dedicated forms in modals.
 - **Debounce real-time preview updates**: Use 100ms debounce for preview updates (WASM rendering is fast enough).
 - **Optimize preview rendering**: Use direct canvas rendering instead of data URLs, cache template conversions, and show previous preview while new one loads.
+- **Popups must escape overflow containers**: Use `fixed` positioning with `getBoundingClientRect()` for dropdowns that may be clipped by `overflow-y-auto` parents.
 
 ## 7) Code quality defaults
 
@@ -94,3 +95,15 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - When user sets margins to 0, the actual margin in the output MUST be 0 (no automatic padding unless explicitly documented).
 - In WASM/Rust code, only add visual margins (like the 10mm preview border) if they are clearly for preview purposes, not part of the actual document layout.
 - Template images must be scaled isotropically to fit target dimensions calculated from mm measurements.
+
+## 12) Preview zoom functionality
+
+- All canvas-based previews MUST support zoom/pan controls for detailed inspection.
+- **Zoom controls**: Mouse wheel, keyboard shortcuts (Ctrl/Cmd +/-/0), and UI buttons.
+- **Pan controls**: Click and drag to pan when zoomed in.
+- **Zoom UI**: Display current zoom percentage, zoom in/out buttons, reset button, and fit-to-screen button.
+- **Fit to screen**: MUST auto-fit canvas on initial load with 10% padding; provide button for manual fit.
+- **Zoom centering**: Mouse wheel zoom MUST be centered precisely on cursor position using accurate coordinate transformation (convert cursor to canvas space, then recalculate pan after zoom).
+- **Help text**: Show keyboard/mouse shortcuts in the preview area including fit-to-screen hint.
+- **Transform approach**: Use CSS `transform: scale()` and `translate()` for smooth, GPU-accelerated zoom/pan.
+- **Zoom range**: MIN_ZOOM = 0.1 (10%), MAX_ZOOM = 5 (500%), ZOOM_STEP = 0.1 (10%).

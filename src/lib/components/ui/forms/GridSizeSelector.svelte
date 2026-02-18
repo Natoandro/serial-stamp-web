@@ -102,7 +102,9 @@
 
 	{#if showPicker}
 		<div
-			class="absolute top-full left-0 z-10 mt-2 rounded-lg border border-gray-200 bg-white p-4 shadow-xl"
+			class="fixed z-50 mt-2 rounded-lg border border-gray-200 bg-white p-4 shadow-xl"
+			style="top: {pickerElement?.getBoundingClientRect().bottom ??
+				0}px; left: {pickerElement?.getBoundingClientRect().left ?? 0}px;"
 		>
 			{#if !manualMode}
 				<div class="space-y-3">

@@ -107,6 +107,45 @@ setTimeout(async () => {
 ✅ **Better UX** - No loading spinner on updates  
 ✅ **Scalable** - Performance consistent regardless of sheet complexity
 
+## Zoom Functionality
+
+Added full zoom/pan support for detailed preview inspection:
+
+### Features
+
+- **Mouse wheel zoom** - Zoom in/out centered on cursor position
+- **Keyboard shortcuts** - Ctrl/Cmd +/- to zoom, Ctrl/Cmd 0 to reset
+- **Click and drag panning** - Pan around when zoomed in
+- **UI controls** - Zoom buttons with percentage display
+- **Help overlay** - Keyboard/mouse shortcut hints
+
+### Implementation
+
+```typescript
+// Zoom state
+let zoom = $state(1);
+let panX = $state(0);
+let panY = $state(0);
+
+// Transform approach (GPU-accelerated)
+style="transform: translate({panX}px, {panY}px) scale({zoom});"
+```
+
+### Zoom Behavior
+
+- **Range**: 10% (MIN_ZOOM) to 500% (MAX_ZOOM)
+- **Step**: 10% increments for keyboard/buttons
+- **Mouse wheel**: Dynamic zoom centered on cursor
+- **Reset**: Returns to 100% zoom, (0, 0) pan
+- **Cursor**: Shows "grab" when idle, "grabbing" when panning
+
+### Benefits
+
+✅ **Detailed inspection** - Zoom up to 500% to check alignment  
+✅ **Smooth performance** - CSS transforms use GPU acceleration  
+✅ **Intuitive controls** - Standard zoom/pan patterns users expect  
+✅ **Accessibility** - Keyboard shortcuts for all operations
+
 ## Future Optimizations
 
 Potential further improvements:
@@ -114,3 +153,4 @@ Potential further improvements:
 - Progressive rendering for large sheets (render visible tickets first)
 - Lower DPI for preview (300 DPI might be overkill for screen)
 - Incremental updates (only re-render changed tickets)
+- Touch gesture support (pinch-to-zoom for mobile)
