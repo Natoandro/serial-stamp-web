@@ -106,4 +106,38 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - **Zoom centering**: Mouse wheel zoom MUST be centered precisely on cursor position using accurate coordinate transformation (convert cursor to canvas space, then recalculate pan after zoom).
 - **Help text**: Show keyboard/mouse shortcuts in the preview area including fit-to-screen hint.
 - **Transform approach**: Use CSS `transform: scale()` and `translate()` for smooth, GPU-accelerated zoom/pan.
+- **Canvas positioning**: Canvas MUST be `position: absolute` within container with `overflow: hidden` to prevent scrollbars.
 - **Zoom range**: MIN_ZOOM = 0.1 (10%), MAX_ZOOM = 5 (500%), ZOOM_STEP = 0.1 (10%).
+
+## 13) Text rendering in WASM
+
+- All text stamps MUST be rendered with actual fonts, not placeholder boxes.
+- Use `ab_glyph` + `imageproc` for text rendering in Rust/WASM.
+- Embed font files in WASM binary using `include_bytes!()` (e.g., Roboto-Regular.ttf).
+- Support text alignment: left, center, right.
+- Support vertical alignment: top, middle, bottom.
+- Scale font size with template scaling factor.
+- Parse CSS color strings using `csscolorparser` crate.
+- Text rendering MUST handle template variable substitution (e.g., `{{number}}`).
+
+## 14) Coordinate system in WASM rendering
+
+- **Stamp coordinates are template-relative**: All stamp positions (x, y) are defined in pixels relative to the ORIGINAL template image size.
+- **Template scaling**: When the template is resized to fit ticket dimensions, calculate scale factors: `template_scale_x = target_width / original_template_width` and `template_scale_y = target_height / original_template_height`.
+- **Apply template scale to stamps**: Multiply all stamp coordinates by the template scale factors, NOT by the sheet-level scale.
+- **Font size scaling**: Use average of x/y template scales for font size: `avg_scale = (template_scale_x + template_scale_y) / 2.0`.
+- **Never use sheet-level scale for stamp positioning**: The `self.scale` in TicketRenderer is for sheet layout, not stamp coordinates.
+
+## 15) Text stamp positioning (anchor point model)
+
+- **Anchor point, not bounding box**: `(x, y)` represents the anchor point for text positioning, NOT the top-left of a bounding box.
+- **Ignore width/height for positioning**: The `width` and `height` fields in TextStamp are NOT used for text positioning calculations.
+- **Measure actual text size**: Always calculate text dimensions using `text_size()` from the rendered font and text string.
+- **Horizontal alignment relative to anchor**:
+  - `left`: Text starts at anchor_x (anchor at left edge of text)
+  - `center`: Text starts at anchor_x - text_width/2 (anchor at center of text)
+  - `right`: Text starts at anchor_x - text_width (anchor at right edge of text)
+- **Vertical alignment relative to anchor**:
+  - `top`: Text starts at anchor_y (anchor at top edge of text)
+  - `middle`: Text starts at anchor_y - text_height/2 (anchor at middle of text)
+  - `bottom`: Text starts at anchor_y - text_height (anchor at bottom edge of text)

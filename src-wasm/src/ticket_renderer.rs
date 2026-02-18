@@ -1,6 +1,8 @@
 use image::{ImageBuffer, Rgba, RgbaImage};
 use serde::Deserialize;
 use std::collections::HashMap;
+use ab_glyph::{FontRef, PxScale, Font, ScaleFont};
+use imageproc::drawing::text_size;
 
 #[derive(Deserialize, Clone)]
 pub struct TemplateData {
@@ -66,7 +68,7 @@ pub struct QrCodeStamp {
 pub struct TicketRenderer {
     template_image: RgbaImage,
     stamps: Vec<Stamp>,
-    scale: f32,
+    font: FontRef<'static>,
 }
 
 impl TicketRenderer {
@@ -79,10 +81,15 @@ impl TicketRenderer {
         )
         .ok_or("Failed to create template image from raw data")?;
 
+        // Load embedded font (Roboto Regular)
+        let font_data = include_bytes!("../fonts/Roboto-Regular.ttf");
+        let font = FontRef::try_from_slice(font_data)
+            .map_err(|e| format!("Failed to load font: {}", e))?;
+
         Ok(TicketRenderer {
             template_image,
             stamps,
-            scale,
+            font,
         })
     }
 
@@ -103,17 +110,22 @@ impl TicketRenderer {
             img.put_pixel(x, y, *pixel);
         }
 
+        // Calculate scale factor for stamp coordinates
+        // Stamps are positioned relative to ORIGINAL template size
+        let template_scale_x = target_width as f32 / self.template_image.width() as f32;
+        let template_scale_y = target_height as f32 / self.template_image.height() as f32;
+
         // Render stamps
         for stamp in &self.stamps {
             match stamp {
                 Stamp::Text(text_stamp) => {
-                    self.render_text_stamp(&mut img, text_stamp, record)?;
+                    self.render_text_stamp(&mut img, text_stamp, record, template_scale_x, template_scale_y)?;
                 }
                 Stamp::Barcode(barcode_stamp) => {
-                    self.render_barcode_stamp(&mut img, barcode_stamp, record)?;
+                    self.render_barcode_stamp(&mut img, barcode_stamp, record, template_scale_x, template_scale_y)?;
                 }
                 Stamp::QrCode(qr_stamp) => {
-                    self.render_qr_stamp(&mut img, qr_stamp, record)?;
+                    self.render_qr_stamp(&mut img, qr_stamp, record, template_scale_x, template_scale_y)?;
                 }
             }
         }
@@ -126,22 +138,86 @@ impl TicketRenderer {
         img: &mut RgbaImage,
         stamp: &TextStamp,
         record: &HashMap<String, String>,
+        scale_x: f32,
+        scale_y: f32,
     ) -> Result<(), String> {
-        let _text = resolve_template(&stamp.template, record);
+        let text = resolve_template(&stamp.template, record);
 
-        // For now, render a placeholder box since proper text rendering requires
-        // font files and complex layout. This will be enhanced in the next iteration.
-        let x = (stamp.x * self.scale) as u32;
-        let y = (stamp.y * self.scale) as u32;
-        let w = (stamp.width * self.scale) as u32;
-        let h = (stamp.height * self.scale) as u32;
+        if text.is_empty() {
+            return Ok(());
+        }
+
+        // Stamp coordinates are relative to ORIGINAL template image size
+        // (x, y) is the ANCHOR POINT, not a bounding box
+        // Scale the anchor point to match the SCALED template size
+        let anchor_x = (stamp.x * scale_x) as i32;
+        let anchor_y = (stamp.y * scale_y) as i32;
 
         // Parse color
         let color = parse_color(&stamp.color).unwrap_or(Rgba([0, 0, 0, 255]));
 
-        // Draw simple text placeholder (will be replaced with actual text rendering)
-        // For MVP, we'll draw a filled rectangle as a visual indicator
-        draw_rect_outline(img, x, y, w, h, color);
+        // Calculate font size scaled - use average of x and y scale for font size
+        let avg_scale = (scale_x + scale_y) / 2.0;
+        let font_size = stamp.font_size * avg_scale;
+        let scale = PxScale::from(font_size);
+
+        // Calculate text dimensions
+        let (text_width, text_height) = text_size(scale, &self.font, &text);
+
+        // Calculate position based on alignment relative to anchor point
+        // Horizontal alignment: left/center/right relative to anchor
+        let text_x = match stamp.alignment.as_str() {
+            "center" => anchor_x - (text_width as i32 / 2),
+            "right" => anchor_x - text_width as i32,
+            _ => anchor_x, // left - anchor is at left edge of text
+        };
+
+        // Vertical alignment: top/middle/bottom relative to anchor
+        let vertical_align = stamp.vertical_align.as_deref().unwrap_or("top");
+        let text_y = match vertical_align {
+            "middle" => anchor_y - (text_height as i32 / 2),
+            "bottom" => anchor_y - text_height as i32,
+            _ => anchor_y, // top - anchor is at top edge of text
+        };
+
+        // Manual text rendering - draw each glyph
+        let (img_w, img_h) = img.dimensions();
+
+        let scaled_font = self.font.as_scaled(scale);
+        let mut cursor_x = text_x as f32;
+
+        for ch in text.chars() {
+            let glyph_id = self.font.glyph_id(ch);
+            let glyph = glyph_id.with_scale(scale);
+
+            if let Some(outlined) = self.font.outline_glyph(glyph) {
+                let bounds = outlined.px_bounds();
+
+                outlined.draw(|gx, gy, coverage| {
+                    if coverage > 0.0 {
+                        let px = (cursor_x + gx as f32 + bounds.min.x) as i32;
+                        let py = (text_y as f32 + gy as f32 + bounds.min.y) as i32;
+
+                        if px >= 0 && py >= 0 && (px as u32) < img_w && (py as u32) < img_h {
+                            let bg = img.get_pixel(px as u32, py as u32);
+                            let alpha = coverage * (color[3] as f32 / 255.0);
+                            let inv_alpha = 1.0 - alpha;
+
+                            let blended = Rgba([
+                                (color[0] as f32 * alpha + bg[0] as f32 * inv_alpha) as u8,
+                                (color[1] as f32 * alpha + bg[1] as f32 * inv_alpha) as u8,
+                                (color[2] as f32 * alpha + bg[2] as f32 * inv_alpha) as u8,
+                                255,
+                            ]);
+
+                            img.put_pixel(px as u32, py as u32, blended);
+                        }
+                    }
+                });
+            }
+
+            cursor_x += scaled_font.h_advance(glyph_id);
+        }
 
         Ok(())
     }
@@ -151,6 +227,8 @@ impl TicketRenderer {
         img: &mut RgbaImage,
         stamp: &BarcodeStamp,
         record: &HashMap<String, String>,
+        scale_x: f32,
+        scale_y: f32,
     ) -> Result<(), String> {
         let text = resolve_template(&stamp.template, record);
 
@@ -158,10 +236,10 @@ impl TicketRenderer {
             return Ok(());
         }
 
-        let x = (stamp.x * self.scale) as u32;
-        let y = (stamp.y * self.scale) as u32;
-        let w = (stamp.width * self.scale) as u32;
-        let h = (stamp.height * self.scale) as u32;
+        let x = (stamp.x * scale_x) as u32;
+        let y = (stamp.y * scale_y) as u32;
+        let w = (stamp.width * scale_x) as u32;
+        let h = (stamp.height * scale_y) as u32;
 
         // Generate barcode using the barcode crate
         let barcode_img = generate_barcode(&text, &stamp.format, w, h)?;
@@ -177,6 +255,8 @@ impl TicketRenderer {
         img: &mut RgbaImage,
         stamp: &QrCodeStamp,
         record: &HashMap<String, String>,
+        scale_x: f32,
+        scale_y: f32,
     ) -> Result<(), String> {
         let text = resolve_template(&stamp.template, record);
 
@@ -184,9 +264,10 @@ impl TicketRenderer {
             return Ok(());
         }
 
-        let x = (stamp.x * self.scale) as u32;
-        let y = (stamp.y * self.scale) as u32;
-        let size = (stamp.width * self.scale) as u32;
+        let x = (stamp.x * scale_x) as u32;
+        let y = (stamp.y * scale_y) as u32;
+        // Use minimum scale to maintain aspect ratio for QR codes
+        let size = (stamp.width * scale_x.min(scale_y)) as u32;
 
         // Generate QR code
         let qr_img = generate_qr_code(&text, &stamp.error_correction, size)?;
@@ -224,32 +305,7 @@ fn parse_color(color: &str) -> Result<Rgba<u8>, String> {
     ]))
 }
 
-// Draw rectangle outline
-fn draw_rect_outline(img: &mut RgbaImage, x: u32, y: u32, w: u32, h: u32, color: Rgba<u8>) {
-    let (img_w, img_h) = img.dimensions();
 
-    // Top and bottom edges
-    for i in 0..w {
-        let px = x + i;
-        if px < img_w && y < img_h {
-            blend_pixel(img, px, y, color);
-        }
-        if px < img_w && y + h < img_h {
-            blend_pixel(img, px, y + h, color);
-        }
-    }
-
-    // Left and right edges
-    for i in 0..h {
-        let py = y + i;
-        if x < img_w && py < img_h {
-            blend_pixel(img, x, py, color);
-        }
-        if x + w < img_w && py < img_h {
-            blend_pixel(img, x + w, py, color);
-        }
-    }
-}
 
 // Alpha blend a pixel
 fn blend_pixel(img: &mut RgbaImage, x: u32, y: u32, color: Rgba<u8>) {
