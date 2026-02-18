@@ -42,13 +42,6 @@
 		onDirtyChange?.(form.state.isDirty);
 	});
 
-	// Emit current form values on any change
-	$effect(() => {
-		const values = form.state.values;
-		// Use untrack to prevent state mutation in reactive context
-		untrack(() => onChange?.(values));
-	});
-
 	// Sync with initialData changes
 	$effect(() => {
 		if (initialData) {
@@ -58,16 +51,23 @@
 		}
 	});
 
+	// Helper to emit current form values
+	function emitChange() {
+		onChange?.(form.state.values);
+	}
+
 	function handlePaperSizeChange(key: string) {
 		const size = PAPER_SIZES[key];
 		if (size) {
 			form.setFieldValue('paperSize', size);
+			emitChange();
 		}
 	}
 
 	function handleGridSizeChange(rows: number, cols: number) {
 		form.setFieldValue('rows', rows);
 		form.setFieldValue('cols', cols);
+		emitChange();
 	}
 </script>
 
@@ -109,8 +109,10 @@
 								id="orientation"
 								class="block w-full rounded-md border-gray-300 py-2 pr-10 pl-3 text-base focus:border-blue-500 focus:ring-blue-500 focus:outline-none sm:text-sm"
 								value={field.state.value}
-								onchange={(e) =>
-									field.handleChange(e.currentTarget.value as 'portrait' | 'landscape')}
+								onchange={(e) => {
+									field.handleChange(e.currentTarget.value as 'portrait' | 'landscape');
+									emitChange();
+								}}
 							>
 								<option value="portrait">Portrait</option>
 								<option value="landscape">Landscape</option>
@@ -143,7 +145,10 @@
 						<NumberInput
 							label="Top"
 							value={field.state.value}
-							oninput={(val) => field.handleChange(val)}
+							oninput={(val) => {
+								field.handleChange(val);
+								emitChange();
+							}}
 							onblur={field.handleBlur}
 							min={0}
 							error={getFieldError(field)}
@@ -155,7 +160,10 @@
 						<NumberInput
 							label="Right"
 							value={field.state.value}
-							oninput={(val) => field.handleChange(val)}
+							oninput={(val) => {
+								field.handleChange(val);
+								emitChange();
+							}}
 							onblur={field.handleBlur}
 							min={0}
 							error={getFieldError(field)}
@@ -167,7 +175,10 @@
 						<NumberInput
 							label="Bottom"
 							value={field.state.value}
-							oninput={(val) => field.handleChange(val)}
+							oninput={(val) => {
+								field.handleChange(val);
+								emitChange();
+							}}
 							onblur={field.handleBlur}
 							min={0}
 							error={getFieldError(field)}
@@ -179,7 +190,10 @@
 						<NumberInput
 							label="Left"
 							value={field.state.value}
-							oninput={(val) => field.handleChange(val)}
+							oninput={(val) => {
+								field.handleChange(val);
+								emitChange();
+							}}
 							onblur={field.handleBlur}
 							min={0}
 							error={getFieldError(field)}
@@ -198,7 +212,10 @@
 						<NumberInput
 							label="Horizontal"
 							value={field.state.value}
-							oninput={(val) => field.handleChange(val)}
+							oninput={(val) => {
+								field.handleChange(val);
+								emitChange();
+							}}
 							onblur={field.handleBlur}
 							min={0}
 							error={getFieldError(field)}
@@ -210,7 +227,10 @@
 						<NumberInput
 							label="Vertical"
 							value={field.state.value}
-							oninput={(val) => field.handleChange(val)}
+							oninput={(val) => {
+								field.handleChange(val);
+								emitChange();
+							}}
 							onblur={field.handleBlur}
 							min={0}
 							error={getFieldError(field)}
