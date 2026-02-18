@@ -1,4 +1,4 @@
-import type { DataSource } from '$lib/types';
+import type { DataSource, CsvDataSource, SequentialDataSource, RandomDataSource } from '$lib/types';
 
 /**
  * Ensures all data sources have names. Used for backward compatibility.
@@ -101,4 +101,88 @@ export function getAvailableKeys(dataSources: DataSource[]): string[] {
 		}
 	}
 	return Array.from(keys);
+}
+
+/**
+ * Generates all records from all data sources.
+ * Merges records from multiple sources into a single array of records.
+ */
+export function generateRecords(dataSources: DataSource[]): Record<string, string>[] {
+	ensureDataSourceNames(dataSources);
+
+	// First, generate records for each source individually
+	const sourceRecords = dataSources.map((source) => {
+		switch (source.type) {
+			case 'csv':
+				return generateCsvRecords(source);
+			case 'sequential':
+				return generateSequentialRecords(source);
+			case 'random':
+				return generateRandomRecords(source);
+			default:
+				return [];
+		}
+	});
+
+	// Determine the maximum number of records
+	const maxRecords = Math.max(0, ...sourceRecords.map((r) => r.length));
+
+	// Merge them
+	const combinedRecords: Record<string, string>[] = [];
+	for (let i = 0; i < maxRecords; i++) {
+		const merged: Record<string, string> = {};
+		sourceRecords.forEach((records) => {
+			if (i < records.length) {
+				Object.assign(merged, records[i]);
+			}
+		});
+		combinedRecords.push(merged);
+	}
+
+	return combinedRecords;
+}
+
+/**
+ * Returns records for a CSV data source.
+ */
+export function generateCsvRecords(source: CsvDataSource): Record<string, string>[] {
+	return source.rows;
+}
+
+/**
+ * Generates records for a sequential data source.
+ */
+export function generateSequentialRecords(source: SequentialDataSource): Record<string, string>[] {
+	const records: Record<string, string>[] = [];
+	const { start, end, step, padLength, prefix, name } = source;
+
+	if (step === 0) return [];
+
+	const isIncrementing = step > 0;
+	for (let num = start; isIncrementing ? num <= end : num >= end; num += step) {
+		const absVal = Math.abs(num);
+		const valueStr = absVal.toString().padStart(padLength, '0');
+		const value = (prefix || '') + (num < 0 ? '-' : '') + valueStr;
+		records.push({ [name]: value });
+	}
+
+	return records;
+}
+
+/**
+ * Generates records for a random data source.
+ */
+export function generateRandomRecords(source: RandomDataSource): Record<string, string>[] {
+	const records: Record<string, string>[] = [];
+	const { charset, length, count, name } = source;
+
+	for (let i = 0; i < count; i++) {
+		let value = '';
+		for (let j = 0; j < length; j++) {
+			value += charset.charAt(Math.floor(Math.random() * charset.length));
+		}
+		records.push({ [name]: value });
+	}
+
+	return records;
 }

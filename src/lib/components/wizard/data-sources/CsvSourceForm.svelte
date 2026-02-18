@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { createForm } from '@tanstack/svelte-form';
+	import Papa from 'papaparse';
 	import { z } from 'zod';
 	import { getFieldError } from '$lib/utils/form';
 	import TextInput from '$lib/components/ui/forms/TextInput.svelte';
@@ -59,7 +60,7 @@
 		}
 	});
 
-	async function handleFileUpload(event: Event) {
+	function handleFileUpload(event: Event) {
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
 
@@ -67,36 +68,26 @@
 
 		fileError = null;
 
-		try {
-			const text = await file.text();
-			const lines = text.split('\n').filter((line) => line.trim());
+		Papa.parse(file, {
+			header: true,
+			skipEmptyLines: true,
+			complete: (results) => {
+				const headers = (results.meta.fields || []) as string[];
+				const rows = results.data as Record<string, string>[];
 
-			if (lines.length < 2) {
-				fileError = 'CSV file must contain at least a header and one data row.';
-				return;
+				if (headers.length === 0 || rows.length === 0) {
+					fileError = 'CSV file must contain at least a header and one data row.';
+					return;
+				}
+
+				form.setFieldValue('columns', headers);
+				form.setFieldValue('rows', rows);
+			},
+			error: (err: any) => {
+				console.error('CSV parse error:', err);
+				fileError = 'Failed to parse CSV file.';
 			}
-
-			// Simple CSV parsing (no quotes, commas only)
-			const headers = lines[0].split(',').map((h) => h.trim());
-			const parsedRows: Record<string, string>[] = [];
-
-			for (let i = 1; i < lines.length; i++) {
-				const values = lines[i].split(',').map((v) => v.trim());
-				const row: Record<string, string> = {};
-				headers.forEach((header, index) => {
-					if (headers[index]) {
-						row[headers[index]] = values[index] || '';
-					}
-				});
-				parsedRows.push(row);
-			}
-
-			form.setFieldValue('columns', headers);
-			form.setFieldValue('rows', parsedRows);
-		} catch (err) {
-			console.error('CSV parse error:', err);
-			fileError = 'Failed to parse CSV file.';
-		}
+		});
 	}
 </script>
 

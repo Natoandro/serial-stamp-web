@@ -1,5 +1,7 @@
-import type { Stamp, TextStamp, DataSource } from '$lib/types';
+import type { Stamp, TextStamp, BarcodeStamp, QrCodeStamp, DataSource } from '$lib/types';
 import { resolveTemplate } from '$lib/engine/template';
+import { generateBarcode } from '$lib/services/barcode';
+import { generateQrCode } from '$lib/services/qrcode';
 
 export interface TicketRendererOptions {
 	ctx: CanvasRenderingContext2D;
@@ -49,12 +51,10 @@ export class TicketRenderer {
 					this.renderTextStamp(stamp as TextStamp, record);
 					break;
 				case 'barcode':
-					// Phase 3: Barcode implementation
-					this.renderPlaceholder(stamp, 'Barcode');
+					await this.renderBarcodeStamp(stamp as BarcodeStamp, record);
 					break;
 				case 'qrcode':
-					// Phase 3: QR code implementation
-					this.renderPlaceholder(stamp, 'QR Code');
+					await this.renderQrCodeStamp(stamp as QrCodeStamp, record);
 					break;
 			}
 
@@ -107,6 +107,60 @@ export class TicketRenderer {
 		}
 
 		ctx.fillText(text, x, y);
+	}
+
+	private async renderBarcodeStamp(
+		stamp: BarcodeStamp,
+		record: Record<string, string>
+	): Promise<void> {
+		const { ctx } = this;
+		const text = resolveTemplate(stamp.template, record, this.dataSources);
+
+		if (!text) {
+			this.renderPlaceholder(stamp, 'Empty Barcode');
+			return;
+		}
+
+		try {
+			const barcodeCanvas = await generateBarcode({
+				text,
+				format: stamp.format,
+				width: stamp.width,
+				height: stamp.height,
+				scale: 4 // Use high scale for better quality
+			});
+
+			ctx.drawImage(barcodeCanvas, stamp.x, stamp.y, stamp.width, stamp.height);
+		} catch (error) {
+			console.error('Barcode rendering failed:', error);
+			this.renderPlaceholder(stamp, 'Error');
+		}
+	}
+
+	private async renderQrCodeStamp(
+		stamp: QrCodeStamp,
+		record: Record<string, string>
+	): Promise<void> {
+		const { ctx } = this;
+		const text = resolveTemplate(stamp.template, record, this.dataSources);
+
+		if (!text) {
+			this.renderPlaceholder(stamp, 'Empty QR');
+			return;
+		}
+
+		try {
+			const qrCanvas = await generateQrCode({
+				text,
+				errorCorrection: stamp.errorCorrection,
+				width: stamp.width * 2 // Higher resolution for drawing
+			});
+
+			ctx.drawImage(qrCanvas, stamp.x, stamp.y, stamp.width, stamp.height);
+		} catch (error) {
+			console.error('QR rendering failed:', error);
+			this.renderPlaceholder(stamp, 'Error');
+		}
 	}
 
 	private renderPlaceholder(stamp: Stamp, label: string): void {
