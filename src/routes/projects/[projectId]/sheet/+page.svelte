@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { untrack } from 'svelte';
 	import { isValidUUID } from '$lib/utils/uuid';
 	import { useProjectQuery, useUpdateProjectMutation } from '$lib/queries/projects.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -29,6 +30,40 @@
 		spacingY: 0
 	};
 
+	// Local layout state for immediate preview updates (independent of save)
+	let currentLayout = $state<SheetLayout>(defaultLayout);
+
+	// Debug logging
+	$effect(() => {
+		console.log('🔍 Debug - Query state:', {
+			isLoading: query.isLoading,
+			isError: query.isError,
+			hasData: !!query.data,
+			projectId,
+			isValidId,
+			hasSheetLayout: !!project?.sheetLayout
+		});
+	});
+
+	// Sync local state when project loads
+	$effect(() => {
+		const sheetLayout = project?.sheetLayout;
+		console.log('🔄 Syncing currentLayout from project:', sheetLayout);
+		if (sheetLayout) {
+			untrack(() => {
+				currentLayout = sheetLayout;
+				console.log('✅ currentLayout updated:', currentLayout);
+			});
+		}
+	});
+
+	// Update preview immediately when form changes (debounced in SheetPreview)
+	function handleLayoutChange(layout: SheetLayout) {
+		console.log('📐 Layout changed:', layout);
+		currentLayout = layout;
+	}
+
+	// Save layout to database (does not trigger preview re-render)
 	async function handleSubmit(layout: SheetLayout) {
 		if (!projectId) return;
 		try {
@@ -93,13 +128,17 @@
 							</p>
 						</div>
 
-						<SheetLayoutForm initialData={project.sheetLayout} onSubmit={handleSubmit} />
+						<SheetLayoutForm
+							initialData={project.sheetLayout}
+							onSubmit={handleSubmit}
+							onChange={handleLayoutChange}
+						/>
 					</div>
 				</div>
 
 				<!-- Preview Section -->
 				<div class="min-h-0 flex-1">
-					<SheetPreview {project} layout={project.sheetLayout || defaultLayout} />
+					<SheetPreview {project} layout={currentLayout} />
 				</div>
 			</div>
 		{/if}

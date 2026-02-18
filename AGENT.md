@@ -53,6 +53,7 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - Forms expose `onDirtyChange` callbacks to notify parents of state changes.
 - Use `getFieldError(field)` utility for consistent error rendering.
 - Avoid inline editing for complex objects; prefer dedicated forms in modals.
+- **Debounce real-time preview updates**: Use 200-300ms debounce when form changes trigger preview regeneration to avoid excessive rendering.
 
 ## 7) Code quality defaults
 
@@ -86,6 +87,9 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - **UNIFORM SCALING ONLY**: All image/ticket scaling MUST use the same factor for both X and Y axes.
 - Use `Math.min(scaleX, scaleY)` to maintain aspect ratio without distortion.
 - Never scale X and Y independently—this causes visual distortion.
+- After uniform scaling, **center** the scaled template within its grid cell to avoid misalignment.
+- Apply scaling ONCE (in WASM), not multiple times in the pipeline.
+- Use `.round()` for ALL pixel calculations in both TypeScript and Rust to ensure dimension matching.
 - When user sets margins to 0, the actual margin in the output MUST be 0 (no automatic padding unless explicitly documented).
 - In WASM/Rust code, only add visual margins (like the 10mm preview border) if they are clearly for preview purposes, not part of the actual document layout.
 - Template images must be scaled isotropically to fit target dimensions calculated from mm measurements.

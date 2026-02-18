@@ -12,9 +12,10 @@
 		initialData?: SheetLayout;
 		onSubmit: (data: SheetLayout) => void | Promise<void>;
 		onDirtyChange?: (isDirty: boolean) => void;
+		onChange?: (data: SheetLayout) => void;
 	}
 
-	let { initialData, onSubmit, onDirtyChange }: Props = $props();
+	let { initialData, onSubmit, onDirtyChange, onChange }: Props = $props();
 
 	const defaultLayout: SheetLayout = {
 		paperSize: PAPER_SIZES.A4,
@@ -39,6 +40,13 @@
 	// Track dirty state
 	$effect(() => {
 		onDirtyChange?.(form.state.isDirty);
+	});
+
+	// Emit current form values on any change
+	$effect(() => {
+		const values = form.state.values;
+		// Use untrack to prevent state mutation in reactive context
+		untrack(() => onChange?.(values));
 	});
 
 	// Sync with initialData changes
