@@ -174,9 +174,30 @@ Located in bottom-left corner:
 <div class="absolute bottom-4 left-4 z-20 bg-white/90">
   <p><strong>Zoom:</strong> Mouse wheel or Ctrl/Cmd +/-</p>
   <p><strong>Pan:</strong> Click and drag</p>
-  <p><strong>Fit:</strong> Click fit button or reload preview</p>
+  <p><strong>Fit:</strong> Click fit button or Ctrl/Cmd 0</p>
 </div>
 ```
+
+### Canvas Structure
+
+```svelte
+<div class="relative flex h-full w-full overflow-hidden" bind:this={containerRef}>
+  <canvas
+    bind:this={canvas}
+    class="absolute"
+    style="transform: translate({panX}px, {panY}px) scale({zoom}); 
+           transform-origin: 0 0; 
+           left: 0; 
+           top: 0;"
+  />
+</div>
+```
+
+**Key points:**
+- Canvas is `position: absolute` within container
+- Transform applied directly to canvas (no wrapper)
+- Container has `overflow: hidden` to prevent scrollbars
+- Transform origin at canvas top-left (0, 0)
 
 ## Browser Compatibility
 
@@ -202,6 +223,23 @@ Located in bottom-left corner:
 - No jarring jumps or layout shifts
 - **Accurate zoom centering** - point under cursor stays stationary
 - Auto-fit on load provides immediate context
+
+### Canvas Positioning Fix
+
+**Issue:** Canvas was overflowing the container and creating horizontal scrollbars.
+
+**Root cause:** 
+- Transform wrapper was causing the canvas to expand beyond viewport
+- Transform origin and positioning were not properly constrained
+- Auto-fit was re-triggering on every canvas change
+
+**Solution:**
+- Canvas positioned absolutely within relative container
+- Transform applied directly to canvas element (no wrapper div)
+- Transform origin at `0 0` (top-left of canvas)
+- Container has `overflow-hidden` to clip any overflow
+- Auto-fit only runs once per preview render (using `hasFitted` flag)
+- Reset zoom now calls `fitToScreen()` instead of hardcoded values
 
 ### Accessibility
 
@@ -247,10 +285,13 @@ Combined, these features provide a professional, responsive preview experience c
 - [x] Zoom percentage display updates
 - [x] Reset zoom returns to 100% centered
 - [x] **Fit to screen button works**
-- [x] **Auto-fit on initial load**
+- [x] **Auto-fit on initial load (once per render)**
 - [x] Min/max zoom limits enforced
 - [x] Cursor changes during pan
 - [x] Help overlay visible with fit hint
 - [x] Works with preview updates
 - [x] No performance degradation
 - [x] Zoom centering uses accurate coordinate transformation
+- [x] **No canvas overflow or horizontal scrollbars**
+- [x] **Container properly constrains canvas**
+- [x] **Reset zoom calls fitToScreen()**

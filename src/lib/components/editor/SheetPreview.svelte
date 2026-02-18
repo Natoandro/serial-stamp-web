@@ -23,6 +23,7 @@
 	let isPanning = $state(false);
 	let lastMouseX = $state(0);
 	let lastMouseY = $state(0);
+	let hasFitted = $state(false);
 
 	const MIN_ZOOM = 0.1;
 	const MAX_ZOOM = 5;
@@ -55,6 +56,9 @@
 			isLoading = true;
 		}
 		error = null;
+
+		// Reset fit flag when layout changes
+		hasFitted = false;
 
 		// Debounce the actual preview generation (reduced to 100ms for snappier feel)
 		debounceTimeout = setTimeout(async () => {
@@ -93,7 +97,7 @@
 		const mouseX = e.clientX - containerRect.left;
 		const mouseY = e.clientY - containerRect.top;
 
-		// Mouse position relative to the canvas (accounting for current transform)
+		// Canvas position relative to container (accounting for current transform)
 		const canvasLeft = canvasRect.left - containerRect.left;
 		const canvasTop = canvasRect.top - containerRect.top;
 
@@ -203,9 +207,7 @@
 	}
 
 	function resetZoom() {
-		zoom = 1;
-		panX = 0;
-		panY = 0;
+		fitToScreen();
 	}
 
 	function fitToScreen() {
@@ -227,13 +229,16 @@
 		const scaleY = containerHeight / canvasHeight;
 		const newZoom = Math.min(scaleX, scaleY);
 
+		// Clamp zoom to valid range
+		const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+
 		// Center the canvas
-		const scaledWidth = canvasWidth * newZoom;
-		const scaledHeight = canvasHeight * newZoom;
+		const scaledWidth = canvasWidth * clampedZoom;
+		const scaledHeight = canvasHeight * clampedZoom;
 
 		panX = (containerRect.width - scaledWidth) / 2;
 		panY = (containerRect.height - scaledHeight) / 2;
-		zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+		zoom = clampedZoom;
 	}
 
 	// Setup keyboard listeners
@@ -257,11 +262,15 @@
 		};
 	});
 
-	// Fit to screen when canvas first loads
+	// Fit to screen when canvas first loads or updates (debounced)
 	$effect(() => {
-		if (canvas && canvas.width > 0 && canvas.height > 0 && isFirstRender === false) {
-			// Small delay to ensure canvas is rendered
-			setTimeout(() => fitToScreen(), 50);
+		if (canvas && canvas.width > 0 && canvas.height > 0 && !isLoading && !hasFitted) {
+			// Small delay to ensure canvas is fully rendered
+			const timer = setTimeout(() => {
+				fitToScreen();
+				hasFitted = true;
+			}, 150);
+			return () => clearTimeout(timer);
 		}
 	});
 </script>
@@ -327,7 +336,7 @@
 	>
 		<p><strong>Zoom:</strong> Mouse wheel or Ctrl/Cmd +/-</p>
 		<p><strong>Pan:</strong> Click and drag</p>
-		<p><strong>Fit:</strong> Click fit button or reload preview</p>
+		<p><strong>Fit:</strong> Click fit button or Ctrl/Cmd 0</p>
 	</div>
 
 	{#if isLoading && isFirstRender}
@@ -354,7 +363,7 @@
 	<!-- Canvas container with zoom/pan -->
 	<div
 		bind:this={containerRef}
-		class="flex h-full items-center justify-center overflow-hidden"
+		class="relative flex h-full w-full items-center justify-center overflow-hidden"
 		style="cursor: {isPanning ? 'grabbing' : 'grab'};"
 		onwheel={handleWheel}
 		onmousedown={handleMouseDown}
@@ -364,12 +373,12 @@
 		aria-label="Sheet preview"
 		tabindex="-1"
 	>
-		<!-- Canvas wrapper with transform -->
-		<div
-			style="transform: translate({panX}px, {panY}px) scale({zoom}); transform-origin: top left; transition: opacity 0.2s;"
+		<!-- Canvas positioned absolutely within container -->
+		<canvas
+			bind:this={canvas}
+			class="absolute"
 			class:opacity-50={isLoading && !isFirstRender}
-		>
-			<canvas bind:this={canvas} style="image-rendering: auto; display: block;"></canvas>
-		</div>
+			style="transform: translate({panX}px, {panY}px) scale({zoom}); transform-origin: 0 0; image-rendering: auto; left: 0; top: 0; transition: opacity 0.2s;"
+		></canvas>
 	</div>
 </div>
