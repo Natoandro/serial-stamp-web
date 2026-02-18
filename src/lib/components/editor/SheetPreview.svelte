@@ -8,28 +8,38 @@
 
 	let { project, layout }: Props = $props();
 
-	// Paper dimensions from layout
-	const paperWidth = $derived(layout.paperSize.widthMm);
-	const paperHeight = $derived(layout.paperSize.heightMm);
+	// Paper dimensions from layout, accounting for orientation
+	const paperWidth = $derived(
+		layout.orientation === 'landscape' ? layout.paperSize.heightMm : layout.paperSize.widthMm
+	);
+	const paperHeight = $derived(
+		layout.orientation === 'landscape' ? layout.paperSize.widthMm : layout.paperSize.heightMm
+	);
 
 	// Calculated ticket dimensions in mm
 	// Formula: (TotalWidth - LeftMargin - RightMargin - (Cols - 1) * SpacingX) / Cols
 	const ticketWidthMm = $derived(
 		layout.cols > 0
-			? (paperWidth - layout.marginLeft - layout.marginRight - (layout.cols - 1) * layout.spacingX) /
+			? (paperWidth -
+					layout.marginLeft -
+					layout.marginRight -
+					(layout.cols - 1) * layout.spacingX) /
 					layout.cols
 			: 0
 	);
 	const ticketHeightMm = $derived(
 		layout.rows > 0
-			? (paperHeight - layout.marginTop - layout.marginBottom - (layout.rows - 1) * layout.spacingY) /
+			? (paperHeight -
+					layout.marginTop -
+					layout.marginBottom -
+					(layout.rows - 1) * layout.spacingY) /
 					layout.rows
 			: 0
 	);
 
 	// Generate ticket positions for preview
 	const tickets = $derived.by(() => {
-		const items = [];
+		const items: Array<{ x: number; y: number; id: string; isFirst: boolean }> = [];
 		if (ticketWidthMm <= 0 || ticketHeightMm <= 0) return items;
 
 		for (let r = 0; r < layout.rows; r++) {
@@ -62,9 +72,11 @@
 
 <div class="flex flex-col items-center gap-6">
 	<div class="flex flex-col items-center text-center">
-		<h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Sheet Preview</h3>
+		<h3 class="text-sm font-semibold tracking-wider text-gray-900 uppercase">Sheet Preview</h3>
 		<p class="mt-1 text-xs text-gray-500">
-			{layout.paperSize.name} • {layout.rows * layout.cols} tickets per page
+			{layout.paperSize.name}
+			{layout.orientation === 'landscape' ? '(Landscape)' : '(Portrait)'} • {layout.rows *
+				layout.cols} tickets per page
 		</p>
 	</div>
 
@@ -109,7 +121,7 @@
 								href={imageUrl}
 								width={ticketWidthMm}
 								height={ticketHeightMm}
-								preserveAspectRatio="xMidYMid slice"
+								preserveAspectRatio="xMidYMid meet"
 								opacity="0.9"
 							/>
 						{:else}
@@ -149,25 +161,25 @@
 	<!-- Measurements Info -->
 	<div class="grid w-full grid-cols-2 gap-4 sm:grid-cols-4">
 		<div
-			class="flex flex-col items-center border border-gray-100 bg-white p-3 shadow-sm rounded-lg"
+			class="flex flex-col items-center rounded-lg border border-gray-100 bg-white p-3 shadow-sm"
 		>
 			<span class="text-[10px] font-bold text-gray-400 uppercase">Ticket Width</span>
 			<span class="text-sm font-semibold text-gray-900">{ticketWidthMm.toFixed(1)} mm</span>
 		</div>
 		<div
-			class="flex flex-col items-center border border-gray-100 bg-white p-3 shadow-sm rounded-lg"
+			class="flex flex-col items-center rounded-lg border border-gray-100 bg-white p-3 shadow-sm"
 		>
 			<span class="text-[10px] font-bold text-gray-400 uppercase">Ticket Height</span>
 			<span class="text-sm font-semibold text-gray-900">{ticketHeightMm.toFixed(1)} mm</span>
 		</div>
 		<div
-			class="flex flex-col items-center border border-gray-100 bg-white p-3 shadow-sm rounded-lg"
+			class="flex flex-col items-center rounded-lg border border-gray-100 bg-white p-3 shadow-sm"
 		>
 			<span class="text-[10px] font-bold text-gray-400 uppercase">Columns</span>
 			<span class="text-sm font-semibold text-gray-900">{layout.cols}</span>
 		</div>
 		<div
-			class="flex flex-col items-center border border-gray-100 bg-white p-3 shadow-sm rounded-lg"
+			class="flex flex-col items-center rounded-lg border border-gray-100 bg-white p-3 shadow-sm"
 		>
 			<span class="text-[10px] font-bold text-gray-400 uppercase">Rows</span>
 			<span class="text-sm font-semibold text-gray-900">{layout.rows}</span>
@@ -175,7 +187,7 @@
 	</div>
 
 	{#if ticketWidthMm <= 0 || ticketHeightMm <= 0}
-		<div class="w-full border border-red-100 bg-red-50 p-4 rounded-lg">
+		<div class="w-full rounded-lg border border-red-100 bg-red-50 p-4">
 			<div class="flex items-center gap-3">
 				<svg class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
 					<path

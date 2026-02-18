@@ -18,6 +18,7 @@
 
 	const defaultLayout: SheetLayout = {
 		paperSize: PAPER_SIZES.A4,
+		orientation: 'portrait',
 		rows: 1,
 		cols: 1,
 		marginTop: 10,

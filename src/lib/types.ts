@@ -108,6 +108,7 @@ export const PAPER_SIZES: Record<string, PaperSize> = {
 
 export interface SheetLayout {
 	paperSize: PaperSize;
+	orientation: 'portrait' | 'landscape';
 	rows: number;
 	cols: number;
 	marginTop: number; // mm
