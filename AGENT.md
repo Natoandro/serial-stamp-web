@@ -53,7 +53,8 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - Forms expose `onDirtyChange` callbacks to notify parents of state changes.
 - Use `getFieldError(field)` utility for consistent error rendering.
 - Avoid inline editing for complex objects; prefer dedicated forms in modals.
-- **Debounce real-time preview updates**: Use 200-300ms debounce when form changes trigger preview regeneration to avoid excessive rendering.
+- **Debounce real-time preview updates**: Use 100ms debounce for preview updates (WASM rendering is fast enough).
+- **Optimize preview rendering**: Use direct canvas rendering instead of data URLs, cache template conversions, and show previous preview while new one loads.
 
 ## 7) Code quality defaults
 

@@ -4,6 +4,15 @@ import { generateRecords } from '$lib/engine/data';
 let wasmModule: typeof import('$lib/wasm/pdf_generator') | null = null;
 let wasmInitialized = false;
 
+// Cache for template RGBA data to avoid repeated conversions
+interface TemplateCache {
+	blob: Blob;
+	width: number;
+	height: number;
+	data: Uint8Array;
+}
+let templateCache: TemplateCache | null = null;
+
 /**
  * Initialize the WASM module (lazy loading)
  */
@@ -20,33 +29,55 @@ async function initWasm() {
 }
 
 /**
- * Convert template image blob to RGBA data for WASM
+ * Convert template image blob to RGBA data for WASM (with caching)
  */
 async function blobToRgbaData(
 	blob: Blob
 ): Promise<{ width: number; height: number; data: Uint8Array }> {
-	return new Promise((resolve, reject) => {
-		const img = new Image();
-		img.onload = () => {
-			const canvas = new OffscreenCanvas(img.width, img.height);
-			const ctx = canvas.getContext('2d');
-			if (!ctx) {
-				reject(new Error('Failed to get canvas context'));
-				return;
-			}
-
-			ctx.drawImage(img, 0, 0);
-			const imageData = ctx.getImageData(0, 0, img.width, img.height);
-
-			resolve({
-				width: img.width,
-				height: img.height,
-				data: new Uint8Array(imageData.data.buffer)
-			});
+	// Check cache first
+	if (templateCache && templateCache.blob === blob) {
+		return {
+			width: templateCache.width,
+			height: templateCache.height,
+			data: templateCache.data
 		};
-		img.onerror = () => reject(new Error('Failed to load image'));
-		img.src = URL.createObjectURL(blob);
-	});
+	}
+
+	// Convert blob to RGBA
+	const result = await new Promise<{ width: number; height: number; data: Uint8Array }>(
+		(resolve, reject) => {
+			const img = new Image();
+			img.onload = () => {
+				const canvas = new OffscreenCanvas(img.width, img.height);
+				const ctx = canvas.getContext('2d');
+				if (!ctx) {
+					reject(new Error('Failed to get canvas context'));
+					return;
+				}
+
+				ctx.drawImage(img, 0, 0);
+				const imageData = ctx.getImageData(0, 0, img.width, img.height);
+
+				resolve({
+					width: img.width,
+					height: img.height,
+					data: new Uint8Array(imageData.data.buffer)
+				});
+			};
+			img.onerror = () => reject(new Error('Failed to load image'));
+			img.src = URL.createObjectURL(blob);
+		}
+	);
+
+	// Cache the result
+	templateCache = {
+		blob,
+		width: result.width,
+		height: result.height,
+		data: result.data
+	};
+
+	return result;
 }
 
 /**
@@ -160,12 +191,13 @@ export async function generateWasmPreview(project: Project, layout: SheetLayout)
 }
 
 /**
- * Generate preview and render directly to a canvas element (even faster - no PNG encoding)
+ * Generate preview and render directly to a canvas element (optimized - no PNG encoding).
+ * This is the FASTEST method for preview rendering.
  */
 export async function renderWasmPreviewToCanvas(
 	project: Project,
 	layout: SheetLayout,
-	canvas: HTMLCanvasElement | OffscreenCanvas
+	canvas: HTMLCanvasElement
 ): Promise<void> {
 	const wasm = await initWasm();
 
@@ -241,10 +273,17 @@ export async function renderWasmPreviewToCanvas(
 
 	// Convert RGBA bytes to ImageData and render directly
 	const imageData = new ImageData(new Uint8ClampedArray(rgbaBytes), width, height);
-	const ctx = canvas.getContext('2d');
-	if (!ctx || !('putImageData' in ctx)) {
+	const ctx = canvas.getContext('2d', { alpha: false });
+	if (!ctx) {
 		throw new Error('Failed to get 2D canvas context');
 	}
 
 	ctx.putImageData(imageData, 0, 0);
+}
+
+/**
+ * Clear the template cache (call when template changes)
+ */
+export function clearTemplateCache(): void {
+	templateCache = null;
 }
