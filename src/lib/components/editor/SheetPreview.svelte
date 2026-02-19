@@ -105,20 +105,26 @@
 		void containerHeight;
 		void geometry;
 
+		// Don't compose until we've fitted to screen at least once
+		if (!hasFitted) return;
 		requestCompose();
 	});
 
 	// requestAnimationFrame dedup
 	let composeRafId: number | null = null;
+	let isComposing = $state(false);
 
 	function requestCompose() {
 		if (composeRafId !== null) return;
 		composeRafId = requestAnimationFrame(doCompose);
 	}
 
-	function doCompose() {
+	async function doCompose() {
 		composeRafId = null;
 		if (!canvas || containerWidth === 0 || containerHeight === 0) return;
+		if (isComposing) return; // Prevent concurrent composition
+
+		isComposing = true;
 
 		// Resize canvas to match container (CSS pixels → device pixels for sharpness)
 		const dpr = window.devicePixelRatio || 1;
@@ -145,11 +151,11 @@
 		};
 
 		try {
-			composeSheet(canvas, geometry, viewport, project).catch((err) => {
-				console.error('Compose error:', err);
-			});
+			await composeSheet(canvas, geometry, viewport, project);
 		} catch (err) {
 			console.error('Compose error:', err);
+		} finally {
+			isComposing = false;
 		}
 	}
 
@@ -256,12 +262,8 @@
 	function fitToScreen() {
 		if (containerWidth === 0 || containerHeight === 0) return;
 
-		const padding = 0.9;
-		const availW = containerWidth * padding;
-		const availH = containerHeight * padding;
-
-		const zoomX = availW / geometry.paperWidthMm;
-		const zoomY = availH / geometry.paperHeightMm;
+		const zoomX = containerWidth / geometry.paperWidthMm;
+		const zoomY = containerHeight / geometry.paperHeightMm;
 		const newZoom = clampZoom(Math.min(zoomX, zoomY));
 
 		const paperW = geometry.paperWidthMm * newZoom;
@@ -295,9 +297,8 @@
 
 	function fitZoomLevel(): number {
 		if (containerWidth === 0 || containerHeight === 0) return 1;
-		const padding = 0.9;
-		const zoomX = (containerWidth * padding) / geometry.paperWidthMm;
-		const zoomY = (containerHeight * padding) / geometry.paperHeightMm;
+		const zoomX = containerWidth / geometry.paperWidthMm;
+		const zoomY = containerHeight / geometry.paperHeightMm;
 		return Math.min(zoomX, zoomY);
 	}
 </script>
