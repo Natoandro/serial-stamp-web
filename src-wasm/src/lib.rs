@@ -82,6 +82,8 @@ pub fn get_render_data_len() -> usize {
 }
 
 async fn render_sheet_impl(config_json: &str, template_data: &[u8], fonts_json: &str) -> Result<Vec<u8>, JsValue> {
+    let t_start = js_sys::Date::now();
+
     let request: RenderConfig = serde_json::from_str(config_json)
         .map_err(|e| JsValue::from_str(&format!("Invalid config JSON: {}", e)))?;
 
@@ -90,11 +92,13 @@ async fn render_sheet_impl(config_json: &str, template_data: &[u8], fonts_json: 
         .map_err(|e| JsValue::from_str(&format!("Invalid fonts JSON: {}", e)))?;
 
     // Fetch all fonts
+    let t1 = js_sys::Date::now();
     let mut fonts_map: HashMap<String, Vec<u8>> = HashMap::new();
     for (font_name, font_url) in fonts_urls {
         let font_data = font_loader::load_font(&font_name, &font_url).await?;
         fonts_map.insert(font_name, font_data);
     }
+    web_sys::console::log_1(&JsValue::from_str(&format!("[WASM PERF] Font loading: {:.1}ms", js_sys::Date::now() - t1)));
 
     let config = &request.sheet_config;
     let dpi = request.dpi;
@@ -172,8 +176,10 @@ async fn render_sheet_impl(config_json: &str, template_data: &[u8], fonts_json: 
     };
 
     // Create ticket renderer with all fonts
+    let t2 = js_sys::Date::now();
     let renderer = TicketRenderer::new(template, request.stamps, fonts_map)
         .map_err(|e| JsValue::from_str(&e))?;
+    web_sys::console::log_1(&JsValue::from_str(&format!("[WASM PERF] Create renderer: {:.1}ms", js_sys::Date::now() - t2)));
 
     // Convert margins and spacing to pixels (must match TypeScript's Math.round())
     let margin_left_px = (config.margin_left_mm * pixels_per_mm).round() as u32;
@@ -184,6 +190,7 @@ async fn render_sheet_impl(config_json: &str, template_data: &[u8], fonts_json: 
     // Render tickets on the first page
     let records_to_render = request.records.len().min(tickets_per_page);
 
+    let t3 = js_sys::Date::now();
     for i in 0..records_to_render {
         let record = &request.records[i];
 
@@ -208,9 +215,15 @@ async fn render_sheet_impl(config_json: &str, template_data: &[u8], fonts_json: 
         // Composite onto sheet
         composite_image(&mut sheet_img, &ticket_img, final_x, final_y);
     }
+    web_sys::console::log_1(&JsValue::from_str(&format!("[WASM PERF] Render {} tickets: {:.1}ms", records_to_render, js_sys::Date::now() - t3)));
+
+    let t4 = js_sys::Date::now();
+    let result = sheet_img.into_raw();
+    web_sys::console::log_1(&JsValue::from_str(&format!("[WASM PERF] Convert to bytes: {:.1}ms", js_sys::Date::now() - t4)));
+    web_sys::console::log_1(&JsValue::from_str(&format!("[WASM PERF] TOTAL WASM: {:.1}ms", js_sys::Date::now() - t_start)));
 
     // Return raw RGBA bytes
-    Ok(sheet_img.into_raw())
+    Ok(result)
 }
 
 /// Legacy function for compositing pre-rendered tickets (kept for compatibility).

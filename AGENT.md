@@ -84,6 +84,20 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - For image processing in WASM, use the `image` crate with PNG/JPEG features enabled.
 - Keep WASM functions focused and simple; handle complex orchestration in TypeScript.
 
+## 10.1) Per-ticket caching strategy
+
+- **Cache key is ONLY the record value**: Individual tickets are cached based SOLELY on their unique data (number, CSV row, etc.) - NO layout parameters in the key.
+- **Render at template size**: All tickets are rendered at the original template image size, then scaled during composition onto the sheet.
+- **Scale during composition**: When layout changes (ticket size, margins, spacing), cached tickets are scaled to fit - no re-rendering needed.
+- **Cache invalidation**: Cache is cleared only when stamps or template image change (detected via config hash). Layout changes do NOT invalidate the cache.
+- **Performance benefits**:
+  - Layout changes (margins, spacing, rows/cols, ticket dimensions) → instant (cached tickets scaled to new size)
+  - Stamp position changes → instant recomposition from cached tickets
+  - Stamp font/size changes → instant recomposition from cached tickets
+  - Only changing record data → re-render only affected tickets
+- **Implementation**: `wasmPreview.ts` renders tickets individually at template size, then uses canvas `drawImage()` to scale and composite them.
+- **Memory tracking**: Use `getCacheStats()` to monitor cache size and memory usage.
+
 ## 11) Scaling discipline (CRITICAL)
 
 - **UNIFORM SCALING ONLY**: All image/ticket scaling MUST use the same factor for both X and Y axes.
