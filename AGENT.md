@@ -88,11 +88,12 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 
 - **Cache key is ONLY the record value**: `JSON.stringify(record)` — no layout, no dimensions, no stamps.
 - **Render at template size**: Tickets are rendered once at the original template pixel size via WASM, stored as `ImageBitmap`.
+- **On-demand rendering**: Tickets are only rendered when they become visible in the viewport. No upfront rendering of all tickets.
 - **Scale during composition**: `composeSheet()` draws cached bitmaps with `drawImage()` scaled to the current zoom/layout. No re-rendering needed for layout or viewport changes.
 - **Cache invalidation**: Flushed only when stamps or template image change (config hash). Layout/viewport changes never invalidate the cache.
-- **Two-phase API**:
-  - `prepareTickets(project)` — async, calls WASM for uncached tickets, returns miss count.
-  - `composeSheet(canvas, geometry, viewport)` — sync, draws only visible cached bitmaps to canvas.
+- **Lazy rendering API**:
+  - `prepareTickets(project)` — lightweight config check, flushes cache if needed, returns boolean (cache flushed or not).
+  - `composeSheet(canvas, geometry, viewport, project)` — async, renders visible uncached tickets on-demand, then draws all visible cached bitmaps to canvas.
 - **ImageBitmap lifecycle**: `clearTicketCache()` calls `bitmap.close()` to free GPU memory.
 
 ## 11) Scaling discipline (CRITICAL)
@@ -112,7 +113,7 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - **Canvas fills container**: Canvas CSS size = container size. Canvas pixel size = container size × devicePixelRatio. No fixed DPI.
 - **Zoom unit is CSS-pixels-per-mm**: `zoom`, `panX`, `panY` are all in CSS pixel space. A paper point at `(mm_x, mm_y)` maps to canvas CSS pixel `(mm_x * zoom + panX, mm_y * zoom + panY)`.
 - **Redraw on every viewport change**: Zoom, pan, resize, and layout changes trigger `requestAnimationFrame` → `composeSheet()`. No CSS transforms — the canvas is redrawn.
-- **Viewport culling**: `composeSheet()` skips tickets whose canvas-space bounding box is entirely outside `[0, 0, cssWidth, cssHeight]`.
+- **Viewport culling**: `composeSheet()` identifies visible tickets and renders only those that aren't cached yet. Tickets outside viewport are never rendered until scrolled into view.
 - **DPR handling**: Canvas buffer is sized at `containerWidth * dpr × containerHeight * dpr`. The 2D context gets `setTransform(dpr, 0, 0, dpr, 0, 0)` so all drawing coordinates remain in CSS pixels.
 - **Zoom controls**: Mouse wheel (centered on cursor), keyboard (Ctrl/Cmd +/-/0), UI buttons.
 - **Pan controls**: Click and drag.

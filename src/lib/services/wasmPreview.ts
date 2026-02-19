@@ -257,12 +257,40 @@ async function ensureTicketRendered(
 }
 
 // ---------------------------------------------------------------------------
-// Ensure all tickets for the current project are rendered & cached.
-// Call this when stamps / template / data sources change.
-// Returns the number of cache misses (tickets actually rendered).
+// Render visible tickets that aren't already cached (on-demand rendering)
 // ---------------------------------------------------------------------------
-export async function prepareTickets(project: Project): Promise<number> {
+async function renderVisibleTickets(
+	project: Project,
+	records: Record<string, string>[]
+): Promise<void> {
 	const wasm = await initWasm();
+	if (!project.templateImage) throw new Error('No template image available');
+
+	const templateData = await blobToRgbaData(project.templateImage);
+	const fontsObject = getFontUrlsFromStamps(project.stamps);
+
+	// Only render tickets that aren't already cached
+	const toRender: Record<string, string>[] = [];
+	for (const record of records) {
+		const key = JSON.stringify(record);
+		if (!ticketCache.has(key)) {
+			toRender.push(record);
+		}
+	}
+
+	// Render missing tickets
+	for (const record of toRender) {
+		await ensureTicketRendered(wasm, templateData, project.stamps, record, fontsObject);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Check for config changes and flush cache if needed.
+// This is a lightweight pre-flight check that doesn't render anything.
+// Returns true if cache was flushed.
+// ---------------------------------------------------------------------------
+export async function prepareTickets(project: Project): Promise<boolean> {
+	await initWasm();
 
 	if (!project.templateImage) throw new Error('No template image available');
 
@@ -273,41 +301,24 @@ export async function prepareTickets(project: Project): Promise<number> {
 		templateType: project.templateImage.type
 	});
 	if (currentConfigHash !== configHash) {
-		ticketCache.clear();
+		clearTicketCache();
 		currentConfigHash = configHash;
+		return true;
 	}
 
-	const templateData = await blobToRgbaData(project.templateImage);
-	const fontsObject = getFontUrlsFromStamps(project.stamps);
-
-	// Build the full record list (all pages worth, but we only need page 1 for now)
-	const records = generateRecords(project.dataSources);
-	const serialized = records.map((r) => {
-		const obj: Record<string, string> = {};
-		for (const k in r) obj[k] = String(r[k]);
-		return obj;
-	});
-
-	let misses = 0;
-	for (const record of serialized) {
-		const key = JSON.stringify(record);
-		if (!ticketCache.has(key)) {
-			await ensureTicketRendered(wasm, templateData, project.stamps, record, fontsObject);
-			misses++;
-		}
-	}
-	return misses;
+	return false;
 }
 
 // ---------------------------------------------------------------------------
-// Compose visible tickets onto a canvas. This is SYNCHRONOUS and fast –
-// no WASM calls, just canvas drawImage from cached ImageBitmaps.
+// Compose visible tickets onto a canvas. This renders missing tickets
+// on-demand and draws all visible cached tickets.
 // ---------------------------------------------------------------------------
-export function composeSheet(
+export async function composeSheet(
 	canvas: HTMLCanvasElement,
 	geo: SheetGeometry,
-	viewport: Viewport
-): { rendered: number; total: number } {
+	viewport: Viewport,
+	project: Project
+): Promise<{ rendered: number; total: number }> {
 	const ctx = canvas.getContext('2d', { alpha: false });
 	if (!ctx) throw new Error('Failed to get 2D context');
 
@@ -345,6 +356,9 @@ export function composeSheet(
 	let rendered = 0;
 	const total = geo.records.length;
 
+	// First pass: identify visible tickets that need rendering
+	const visibleRecords: Record<string, string>[] = [];
+
 	for (let i = 0; i < total; i++) {
 		const row = Math.floor(i / geo.cols);
 		const col = i % geo.cols;
@@ -367,10 +381,42 @@ export function composeSheet(
 			continue;
 		}
 
-		// Look up cached bitmap
+		// This ticket is visible
+		visibleRecords.push(geo.records[i]);
+	}
+
+	// Render any visible tickets that aren't cached yet
+	if (visibleRecords.length > 0) {
+		await renderVisibleTickets(project, visibleRecords);
+	}
+
+	// Second pass: draw all visible tickets (now all cached)
+	for (let i = 0; i < total; i++) {
+		const row = Math.floor(i / geo.cols);
+		const col = i % geo.cols;
+
+		// Cell position in mm
+		const cellMmX = geo.marginLeftMm + col * (geo.ticketWidthMm + geo.spacingXMm);
+		const cellMmY = geo.marginTopMm + row * (geo.ticketHeightMm + geo.spacingYMm);
+
+		// Cell position on canvas
+		const cellCanvasX = cellMmX * zoom + panX;
+		const cellCanvasY = cellMmY * zoom + panY;
+
+		// Viewport culling
+		if (
+			cellCanvasX + cellW < 0 ||
+			cellCanvasY + cellH < 0 ||
+			cellCanvasX > cw ||
+			cellCanvasY > ch
+		) {
+			continue;
+		}
+
+		// Look up cached bitmap (should always exist now)
 		const key = JSON.stringify(geo.records[i]);
 		const cached = ticketCache.get(key);
-		if (!cached) continue; // Not yet rendered – will appear after prepareTickets
+		if (!cached) continue; // Skip if somehow not rendered
 
 		// Uniform scaling: maintain template aspect ratio within cell
 		const scaleX = cellW / cached.width;

@@ -145,7 +145,9 @@
 		};
 
 		try {
-			composeSheet(canvas, geometry, viewport);
+			composeSheet(canvas, geometry, viewport, project).catch((err) => {
+				console.error('Compose error:', err);
+			});
 		} catch (err) {
 			console.error('Compose error:', err);
 		}
