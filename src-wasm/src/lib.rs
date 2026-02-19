@@ -4,9 +4,21 @@ mod font_loader;
 use image::{ImageBuffer, RgbaImage, Rgba};
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::cell::RefCell;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 use ticket_renderer::{TicketRenderer, TemplateData, Stamp};
+
+// Thread-local storage for the last rendered image data
+thread_local! {
+    static LAST_RENDER: RefCell<Vec<u8>> = RefCell::new(Vec::new());
+}
+
+/// Get access to the WASM memory buffer
+#[wasm_bindgen]
+pub fn get_memory() -> JsValue {
+    wasm_bindgen::memory()
+}
 
 #[derive(Deserialize)]
 pub struct SheetConfig {
@@ -35,13 +47,37 @@ pub struct RenderConfig {
 /// Renders a complete sheet with tickets generated entirely in WASM.
 /// This is the main entry point for high-performance preview generation.
 ///
-/// Returns a Promise that resolves to raw RGBA bytes that can be directly used with ImageData or canvas.
+/// Returns a Promise that resolves to the length of the rendered data.
+/// Call get_render_data_ptr() to get a pointer to the data for zero-copy access.
 #[wasm_bindgen]
 pub fn render_sheet(config_json: String, template_data: Vec<u8>, fonts_json: String) -> js_sys::Promise {
     future_to_promise(async move {
-        render_sheet_impl(&config_json, &template_data, &fonts_json)
-            .await
-            .map(|bytes| JsValue::from(js_sys::Uint8Array::from(&bytes[..])))
+        match render_sheet_impl(&config_json, &template_data, &fonts_json).await {
+            Ok(bytes) => {
+                let len = bytes.len();
+                LAST_RENDER.with(|cell| {
+                    *cell.borrow_mut() = bytes;
+                });
+                Ok(JsValue::from(len as u32))
+            }
+            Err(e) => Err(e)
+        }
+    })
+}
+
+/// Get a pointer to the last rendered image data (zero-copy access)
+#[wasm_bindgen]
+pub fn get_render_data_ptr() -> *const u8 {
+    LAST_RENDER.with(|cell| {
+        cell.borrow().as_ptr()
+    })
+}
+
+/// Get the length of the last rendered image data
+#[wasm_bindgen]
+pub fn get_render_data_len() -> usize {
+    LAST_RENDER.with(|cell| {
+        cell.borrow().len()
     })
 }
 

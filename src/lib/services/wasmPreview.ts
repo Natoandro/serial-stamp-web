@@ -178,24 +178,29 @@ export async function generateWasmPreview(project: Project, layout: SheetLayout)
 	// Get font URLs for WASM to fetch
 	const fontsObject = getFontUrlsFromStamps(project.stamps);
 
-	// Call WASM render function - pass template data and fonts URLs (returns Promise)
+	// Call WASM render function - pass template data and fonts URLs (returns Promise with data length)
 	const configJson = JSON.stringify(config);
 	const fontsJson = JSON.stringify(fontsObject);
-	const rgbaBytes = await wasm.render_sheet(configJson, templateData.data, fontsJson);
+	const dataLength = (await wasm.render_sheet(configJson, templateData.data, fontsJson)) as number;
 
 	// Validate data length
-	if (rgbaBytes.length !== width * height * 4) {
+	if (dataLength !== width * height * 4) {
 		throw new Error(
 			`WASM returned incorrect data size.\n` +
 				`Expected: ${width * height * 4} bytes (${width}px × ${height}px × 4 channels)\n` +
-				`Got: ${rgbaBytes.length} bytes\n` +
+				`Got: ${dataLength} bytes\n` +
 				`Paper: ${paperWidth}mm × ${paperHeight}mm at ${dpi} DPI\n` +
 				`This suggests a dimension calculation mismatch between TS and Rust.`
 		);
 	}
 
+	// Access WASM memory directly (zero-copy)
+	const ptr = wasm.get_render_data_ptr();
+	const memoryBuffer = (wasm.get_memory() as WebAssembly.Memory).buffer;
+	const memory = new Uint8Array(memoryBuffer, ptr, dataLength);
+
 	// Convert RGBA bytes to ImageData
-	const imageData = new ImageData(new Uint8ClampedArray(rgbaBytes), width, height);
+	const imageData = new ImageData(new Uint8ClampedArray(memory), width, height);
 
 	// Render to canvas and convert to data URL
 	const canvas = new OffscreenCanvas(width, height);
@@ -285,15 +290,15 @@ export async function renderWasmPreviewToCanvas(
 	// Get font URLs for WASM to fetch
 	const fontsObject = getFontUrlsFromStamps(project.stamps);
 
-	// Call WASM render function - pass template data and fonts URLs (returns Promise)
+	// Call WASM render function - pass template data and fonts URLs (returns Promise with data length)
 	const configJson = JSON.stringify(config);
 	const fontsJson = JSON.stringify(fontsObject);
-	const rgbaBytes = await wasm.render_sheet(configJson, templateData.data, fontsJson);
+	const dataLength = (await wasm.render_sheet(configJson, templateData.data, fontsJson)) as number;
 
 	// Validate data length
-	if (rgbaBytes.length !== width * height * 4) {
+	if (dataLength !== width * height * 4) {
 		throw new Error(
-			`WASM returned incorrect data size. Expected ${width * height * 4} bytes (${width}x${height}x4), got ${rgbaBytes.length} bytes`
+			`WASM returned incorrect data size. Expected ${width * height * 4} bytes (${width}x${height}x4), got ${dataLength} bytes`
 		);
 	}
 
@@ -301,8 +306,13 @@ export async function renderWasmPreviewToCanvas(
 	canvas.width = width;
 	canvas.height = height;
 
+	// Access WASM memory directly (zero-copy)
+	const ptr = wasm.get_render_data_ptr();
+	const memoryBuffer = (wasm.get_memory() as WebAssembly.Memory).buffer;
+	const memory = new Uint8Array(memoryBuffer, ptr, dataLength);
+
 	// Convert RGBA bytes to ImageData and render directly
-	const imageData = new ImageData(new Uint8ClampedArray(rgbaBytes), width, height);
+	const imageData = new ImageData(new Uint8ClampedArray(memory), width, height);
 	const ctx = canvas.getContext('2d', { alpha: false });
 	if (!ctx) {
 		throw new Error('Failed to get 2D canvas context');
