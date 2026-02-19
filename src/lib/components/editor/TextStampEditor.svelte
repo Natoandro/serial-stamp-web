@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { TextStamp, DataSource } from '$lib/types';
+	import { AVAILABLE_FONTS } from '$lib/types';
 	import TemplateSyntaxHelp from '$lib/components/ui/TemplateSyntaxHelp.svelte';
 
 	interface Props {
@@ -9,15 +10,6 @@
 	}
 
 	let { stamp, dataSources, onUpdate }: Props = $props();
-
-	const fontFamilies = [
-		{ value: 'Arial, sans-serif', label: 'Arial' },
-		{ value: '"Times New Roman", serif', label: 'Times New Roman' },
-		{ value: '"Courier New", monospace', label: 'Courier New' },
-		{ value: 'Georgia, serif', label: 'Georgia' },
-		{ value: 'Verdana, sans-serif', label: 'Verdana' },
-		{ value: '"Helvetica Neue", Helvetica, Arial, sans-serif', label: 'Helvetica' }
-	];
 
 	const alignments = [
 		{ value: 'left', label: 'Left' },
@@ -89,8 +81,8 @@
 				value={stamp.fontFamily}
 				onchange={(e) => onUpdate({ fontFamily: e.currentTarget.value })}
 			>
-				{#each fontFamilies as font (font.value)}
-					<option value={font.value}>{font.label}</option>
+				{#each AVAILABLE_FONTS as font (font.name)}
+					<option value={font.name}>{font.displayName}</option>
 				{/each}
 			</select>
 		</div>

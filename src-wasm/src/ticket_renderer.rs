@@ -68,11 +68,11 @@ pub struct QrCodeStamp {
 pub struct TicketRenderer {
     template_image: RgbaImage,
     stamps: Vec<Stamp>,
-    font: FontRef<'static>,
+    font_data: Vec<u8>,
 }
 
 impl TicketRenderer {
-    pub fn new(template_data: TemplateData, stamps: Vec<Stamp>, scale: f32) -> Result<Self, String> {
+    pub fn new(template_data: TemplateData, stamps: Vec<Stamp>, font_data: Vec<u8>) -> Result<Self, String> {
         // Convert template data bytes to RgbaImage
         let template_image = ImageBuffer::from_raw(
             template_data.width,
@@ -81,15 +81,14 @@ impl TicketRenderer {
         )
         .ok_or("Failed to create template image from raw data")?;
 
-        // Load embedded font (Roboto Regular)
-        let font_data = include_bytes!("../fonts/Roboto-Regular.ttf");
-        let font = FontRef::try_from_slice(font_data)
+        // Validate font data
+        FontRef::try_from_slice(&font_data)
             .map_err(|e| format!("Failed to load font: {}", e))?;
 
         Ok(TicketRenderer {
             template_image,
             stamps,
-            font,
+            font_data,
         })
     }
 
@@ -147,6 +146,10 @@ impl TicketRenderer {
             return Ok(());
         }
 
+        // Load font from stored font data
+        let font = FontRef::try_from_slice(&self.font_data)
+            .map_err(|e| format!("Failed to load font: {}", e))?;
+
         // Stamp coordinates are relative to ORIGINAL template image size
         // (x, y) is the ANCHOR POINT, not a bounding box
         // Scale the anchor point to match the SCALED template size
@@ -162,7 +165,7 @@ impl TicketRenderer {
         let scale = PxScale::from(font_size);
 
         // Calculate text dimensions
-        let (text_width, text_height) = text_size(scale, &self.font, &text);
+        let (text_width, text_height) = text_size(scale, &font, &text);
 
         // Calculate position based on alignment relative to anchor point
         // Horizontal alignment: left/center/right relative to anchor
@@ -183,14 +186,14 @@ impl TicketRenderer {
         // Manual text rendering - draw each glyph
         let (img_w, img_h) = img.dimensions();
 
-        let scaled_font = self.font.as_scaled(scale);
+        let scaled_font = font.as_scaled(scale);
         let mut cursor_x = text_x as f32;
 
         for ch in text.chars() {
-            let glyph_id = self.font.glyph_id(ch);
+            let glyph_id = font.glyph_id(ch);
             let glyph = glyph_id.with_scale(scale);
 
-            if let Some(outlined) = self.font.outline_glyph(glyph) {
+            if let Some(outlined) = font.outline_glyph(glyph) {
                 let bounds = outlined.px_bounds();
 
                 outlined.draw(|gx, gy, coverage| {

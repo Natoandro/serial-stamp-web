@@ -1,5 +1,6 @@
 import type { Project, SheetLayout, Stamp } from '$lib/types';
 import { generateRecords } from '$lib/engine/data';
+import { loadFont } from './fontLoader';
 
 let wasmModule: typeof import('$lib/wasm/pdf_generator') | null = null;
 let wasmInitialized = false;
@@ -91,6 +92,17 @@ function serializeStamps(stamps: Stamp[]): unknown[] {
 }
 
 /**
+ * Get font name from stamps (returns first text stamp's font, or default)
+ */
+function getFontFromStamps(stamps: Stamp[]): string {
+	const textStamp = stamps.find((s) => s.type === 'text');
+	if (textStamp && textStamp.type === 'text') {
+		return textStamp.fontFamily;
+	}
+	return 'Roboto'; // Default font
+}
+
+/**
  * Generate sheet preview entirely in WASM (high performance)
  * Returns a data URL for direct rendering in an <img> or <canvas>
  */
@@ -153,9 +165,13 @@ export async function generateWasmPreview(project: Project, layout: SheetLayout)
 	const width = Math.round(paperWidth * pixelsPerMm);
 	const height = Math.round(paperHeight * pixelsPerMm);
 
-	// Call WASM render function - pass template data as separate Uint8Array
+	// Load font data for text stamps
+	const fontName = getFontFromStamps(project.stamps);
+	const fontData = await loadFont(fontName);
+
+	// Call WASM render function - pass template data and font data as separate Uint8Arrays
 	const configJson = JSON.stringify(config);
-	const rgbaBytes = wasm.render_sheet(configJson, templateData.data);
+	const rgbaBytes = wasm.render_sheet(configJson, templateData.data, new Uint8Array(fontData));
 
 	// Validate data length
 	if (rgbaBytes.length !== width * height * 4) {
@@ -256,9 +272,13 @@ export async function renderWasmPreviewToCanvas(
 	const width = Math.round(paperWidth * pixelsPerMm);
 	const height = Math.round(paperHeight * pixelsPerMm);
 
-	// Call WASM render function - pass template data as separate Uint8Array
+	// Load font data for text stamps
+	const fontName = getFontFromStamps(project.stamps);
+	const fontData = await loadFont(fontName);
+
+	// Call WASM render function - pass template data and font data as separate Uint8Arrays
 	const configJson = JSON.stringify(config);
-	const rgbaBytes = wasm.render_sheet(configJson, templateData.data);
+	const rgbaBytes = wasm.render_sheet(configJson, templateData.data, new Uint8Array(fontData));
 
 	// Validate data length
 	if (rgbaBytes.length !== width * height * 4) {

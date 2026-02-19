@@ -35,7 +35,7 @@ pub struct RenderConfig {
 ///
 /// Returns raw RGBA bytes that can be directly used with ImageData or canvas.
 #[wasm_bindgen]
-pub fn render_sheet(config_json: &str, template_data: &[u8]) -> Result<Vec<u8>, JsValue> {
+pub fn render_sheet(config_json: &str, template_data: &[u8], font_data: &[u8]) -> Result<Vec<u8>, JsValue> {
     let request: RenderConfig = serde_json::from_str(config_json)
         .map_err(|e| JsValue::from_str(&format!("Invalid config JSON: {}", e)))?;
 
@@ -115,7 +115,7 @@ pub fn render_sheet(config_json: &str, template_data: &[u8]) -> Result<Vec<u8>, 
     };
 
     // Create ticket renderer
-    let renderer = TicketRenderer::new(template, request.stamps, scale)
+    let renderer = TicketRenderer::new(template, request.stamps, font_data.to_vec())
         .map_err(|e| JsValue::from_str(&e))?;
 
     // Convert margins and spacing to pixels (must match TypeScript's Math.round())

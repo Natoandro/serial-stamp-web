@@ -22,11 +22,7 @@ Install dependencies (the repo uses pnpm):
 
 ```/dev/null/sh#L1-1
 pnpm install
-```
-
-Start the dev server:
-
-```/dev/null/sh#L1-1
+pnpm run build:wasm
 pnpm dev
 ```
 
@@ -37,6 +33,7 @@ These are the available scripts (from `package.json`):
 - `dev`: start the Vite dev server
 - `build`: create a production build
 - `preview`: preview the production build locally
+- `build:wasm`: build the Rust/WASM rendering module
 - `prepare`: run SvelteKit sync (used by tooling)
 - `check`: run SvelteKit sync + `svelte-check`
 - `check:watch`: same as `check`, in watch mode

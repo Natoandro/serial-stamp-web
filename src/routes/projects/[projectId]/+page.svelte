@@ -66,7 +66,7 @@
 				...common,
 				type: 'text',
 				template: 'Sample Text',
-				fontFamily: 'Arial, sans-serif',
+				fontFamily: 'Roboto',
 				fontSize: 24,
 				color: '#000000',
 				alignment: 'left',
