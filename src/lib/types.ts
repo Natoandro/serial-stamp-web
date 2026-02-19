@@ -16,31 +16,31 @@ export const AVAILABLE_FONTS: FontDefinition[] = [
 		name: 'Roboto',
 		displayName: 'Roboto',
 		fileName: 'Roboto-Regular.ttf',
-		url: 'https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Regular.ttf'
+		url: '/fonts/Roboto-Regular.ttf'
 	},
 	{
 		name: 'Open Sans',
 		displayName: 'Open Sans',
 		fileName: 'OpenSans-Regular.ttf',
-		url: 'https://github.com/google/fonts/raw/main/apache/opensans/static/OpenSans-Regular.ttf'
+		url: '/fonts/OpenSans-Regular.ttf'
 	},
 	{
 		name: 'Lora',
 		displayName: 'Lora',
 		fileName: 'Lora-Regular.ttf',
-		url: 'https://github.com/google/fonts/raw/main/ofl/lora/static/Lora-Regular.ttf'
+		url: '/fonts/Lora-Regular.ttf'
 	},
 	{
 		name: 'Roboto Mono',
 		displayName: 'Roboto Mono',
 		fileName: 'RobotoMono-Regular.ttf',
-		url: 'https://github.com/google/fonts/raw/main/apache/robotomono/static/RobotoMono-Regular.ttf'
+		url: '/fonts/RobotoMono-Regular.ttf'
 	},
 	{
 		name: 'Inter',
 		displayName: 'Inter',
 		fileName: 'Inter-Regular.ttf',
-		url: 'https://github.com/google/fonts/raw/main/ofl/inter/static/Inter-Regular.ttf'
+		url: '/fonts/Inter-Regular.ttf'
 	}
 ];
 

@@ -113,9 +113,9 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 
 - All text stamps MUST be rendered with actual fonts, not placeholder boxes.
 - Use `ab_glyph` + `imageproc` for text rendering in Rust/WASM.
-- **Font loading**: Fonts are fetched from public CDN (GitHub raw URLs) by the frontend and passed to WASM as `Vec<u8>`.
+- **Font loading**: Fonts are served from `static/fonts/` and fetched by the frontend, then passed to WASM as `Vec<u8>`.
 - **Available fonts**: Only the 5 fonts defined in `AVAILABLE_FONTS` (types.ts) are available in the font selector.
-- **Font CDN**: Fonts loaded from GitHub: Roboto, Open Sans, Lora, Roboto Mono, Inter (all Regular weight).
+- **Font files**: 5 TTF files in `static/fonts/`: Roboto-Regular.ttf, OpenSans-Regular.ttf, Lora-Regular.ttf, RobotoMono-Regular.ttf, Inter-Regular.ttf (committed to repo).
 - **Font caching**: Frontend caches loaded fonts using `fontLoader.ts` service.
 - **WASM signature**: `render_sheet()` accepts font data as third parameter: `render_sheet(config_json, template_data, font_data)`.
 - Support text alignment: left, center, right.
