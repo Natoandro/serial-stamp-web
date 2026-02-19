@@ -52,14 +52,20 @@ export interface SheetGeometry {
 	paperHeightMm: number;
 	ticketWidthMm: number;
 	ticketHeightMm: number;
+	templateWidthPx: number;
+	templateHeightPx: number;
 	marginLeftMm: number;
 	marginTopMm: number;
+	marginRightMm: number;
+	marginBottomMm: number;
 	spacingXMm: number;
 	spacingYMm: number;
 	rows: number;
 	cols: number;
 	/** Serialised records for this page (simple key-value objects) */
 	records: Record<string, string>[];
+	/** Alignment mode for extra space distribution */
+	alignment: 'top-left' | 'center' | 'space-between';
 }
 
 // ---------------------------------------------------------------------------
@@ -138,15 +144,29 @@ function getFontUrlsFromStamps(stamps: Stamp[]): Record<string, string> {
 }
 
 // ---------------------------------------------------------------------------
-// Compute sheet geometry from project + layout (pure, no side-effects)
+// Compute sheet geometry from project + layout
+// NOTE: This is async because we need template dimensions from the blob
 // ---------------------------------------------------------------------------
-export function computeSheetGeometry(project: Project, layout: SheetLayout): SheetGeometry {
+export async function computeSheetGeometry(
+	project: Project,
+	layout: SheetLayout
+): Promise<SheetGeometry> {
 	const paperWidthMm =
 		layout.orientation === 'landscape' ? layout.paperSize.heightMm : layout.paperSize.widthMm;
 	const paperHeightMm =
 		layout.orientation === 'landscape' ? layout.paperSize.widthMm : layout.paperSize.heightMm;
 
-	const ticketWidthMm =
+	// Get template dimensions (need to load the image to get pixel size)
+	let templateWidthPx = 0;
+	let templateHeightPx = 0;
+	if (project.templateImage) {
+		const templateData = await blobToRgbaData(project.templateImage);
+		templateWidthPx = templateData.width;
+		templateHeightPx = templateData.height;
+	}
+
+	// Calculate maximum ticket dimensions based on grid constraints
+	const ticketMaxWidthMm =
 		layout.cols > 0
 			? (paperWidthMm -
 					layout.marginLeft -
@@ -154,7 +174,7 @@ export function computeSheetGeometry(project: Project, layout: SheetLayout): She
 					(layout.cols - 1) * layout.spacingX) /
 				layout.cols
 			: 0;
-	const ticketHeightMm =
+	const ticketMaxHeightMm =
 		layout.rows > 0
 			? (paperHeightMm -
 					layout.marginTop -
@@ -162,6 +182,18 @@ export function computeSheetGeometry(project: Project, layout: SheetLayout): She
 					(layout.rows - 1) * layout.spacingY) /
 				layout.rows
 			: 0;
+
+	// Calculate scale to fit template within max dimensions (maintaining aspect ratio)
+	let scale = 1;
+	if (templateWidthPx > 0 && templateHeightPx > 0) {
+		const scaleX = ticketMaxWidthMm / templateWidthPx;
+		const scaleY = ticketMaxHeightMm / templateHeightPx;
+		scale = Math.min(scaleX, scaleY); // Uniform scaling
+	}
+
+	// Actual ticket size (scaled template)
+	const ticketWidthMm = templateWidthPx * scale;
+	const ticketHeightMm = templateHeightPx * scale;
 
 	const records = generateRecords(project.dataSources);
 	const ticketsPerPage = layout.rows * layout.cols;
@@ -176,13 +208,18 @@ export function computeSheetGeometry(project: Project, layout: SheetLayout): She
 		paperHeightMm,
 		ticketWidthMm,
 		ticketHeightMm,
+		templateWidthPx,
+		templateHeightPx,
 		marginLeftMm: layout.marginLeft,
 		marginTopMm: layout.marginTop,
+		marginRightMm: layout.marginRight,
+		marginBottomMm: layout.marginBottom,
 		spacingXMm: layout.spacingX,
 		spacingYMm: layout.spacingY,
 		rows: layout.rows,
 		cols: layout.cols,
-		records: serialized
+		records: serialized,
+		alignment: layout.alignment
 	};
 }
 
@@ -359,13 +396,47 @@ export async function composeSheet(
 	// First pass: identify visible tickets that need rendering
 	const visibleRecords: Record<string, string>[] = [];
 
+	// Calculate effective margins and spacing based on alignment mode
+	// Tickets are sized based on template aspect ratio, so one axis will have extra space
+	let effectiveMarginLeft = geo.marginLeftMm;
+	let effectiveMarginTop = geo.marginTopMm;
+	let effectiveSpacingX = geo.spacingXMm;
+	let effectiveSpacingY = geo.spacingYMm;
+
+	// Calculate total grid dimensions with specified spacing
+	const totalGridWidth = geo.cols * geo.ticketWidthMm + (geo.cols - 1) * geo.spacingXMm;
+	const totalGridHeight = geo.rows * geo.ticketHeightMm + (geo.rows - 1) * geo.spacingYMm;
+
+	// Available space (excluding margins)
+	const availableWidth = geo.paperWidthMm - geo.marginLeftMm - geo.marginRightMm;
+	const availableHeight = geo.paperHeightMm - geo.marginTopMm - geo.marginBottomMm;
+
+	// Extra space on each axis (due to aspect ratio constraint)
+	const extraX = availableWidth - totalGridWidth;
+	const extraY = availableHeight - totalGridHeight;
+
+	if (geo.alignment === 'center') {
+		// Center: distribute extra space evenly to both sides
+		effectiveMarginLeft = geo.marginLeftMm + extraX / 2;
+		effectiveMarginTop = geo.marginTopMm + extraY / 2;
+		// Spacing stays as specified
+	} else if (geo.alignment === 'space-between') {
+		// Space-between: margins stay exact, distribute extra space into spacing
+		const totalTicketsWidth = geo.cols * geo.ticketWidthMm;
+		const totalTicketsHeight = geo.rows * geo.ticketHeightMm;
+		effectiveSpacingX = geo.cols > 1 ? (availableWidth - totalTicketsWidth) / (geo.cols - 1) : 0;
+		effectiveSpacingY = geo.rows > 1 ? (availableHeight - totalTicketsHeight) / (geo.rows - 1) : 0;
+		// Margins stay exact (already set above)
+	}
+	// For 'top-left': margins exact on left/top, spacing exact, extra space goes to right/bottom
+
 	for (let i = 0; i < total; i++) {
 		const row = Math.floor(i / geo.cols);
 		const col = i % geo.cols;
 
 		// Cell position in mm
-		const cellMmX = geo.marginLeftMm + col * (geo.ticketWidthMm + geo.spacingXMm);
-		const cellMmY = geo.marginTopMm + row * (geo.ticketHeightMm + geo.spacingYMm);
+		const cellMmX = effectiveMarginLeft + col * (geo.ticketWidthMm + effectiveSpacingX);
+		const cellMmY = effectiveMarginTop + row * (geo.ticketHeightMm + effectiveSpacingY);
 
 		// Cell position on canvas
 		const cellCanvasX = cellMmX * zoom + panX;
@@ -395,9 +466,9 @@ export async function composeSheet(
 		const row = Math.floor(i / geo.cols);
 		const col = i % geo.cols;
 
-		// Cell position in mm
-		const cellMmX = geo.marginLeftMm + col * (geo.ticketWidthMm + geo.spacingXMm);
-		const cellMmY = geo.marginTopMm + row * (geo.ticketHeightMm + geo.spacingYMm);
+		// Cell position in mm (using same effective values calculated above)
+		const cellMmX = effectiveMarginLeft + col * (geo.ticketWidthMm + effectiveSpacingX);
+		const cellMmY = effectiveMarginTop + row * (geo.ticketHeightMm + effectiveSpacingY);
 
 		// Cell position on canvas
 		const cellCanvasX = cellMmX * zoom + panX;

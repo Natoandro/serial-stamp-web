@@ -161,6 +161,7 @@ export interface SheetLayout {
 	marginLeft: number; // mm
 	spacingX: number; // mm
 	spacingY: number; // mm
+	alignment: 'top-left' | 'center' | 'space-between'; // How to distribute extra space
 }
 
 // ============================================================================

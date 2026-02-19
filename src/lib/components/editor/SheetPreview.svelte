@@ -47,7 +47,17 @@
 	const ZOOM_FACTOR = 1.1;
 
 	// Cached geometry (recomputed on layout change)
-	let geometry = $derived<SheetGeometry>(computeSheetGeometry(project, layout));
+	let geometry = $state<SheetGeometry | null>(null);
+
+	// Compute geometry when project or layout changes
+	$effect(() => {
+		void project;
+		void layout;
+
+		computeSheetGeometry(project, layout).then((geo) => {
+			geometry = geo;
+		});
+	});
 
 	// Track template changes to clear cache
 	let previousTemplate = $state<Blob | null>(null);
@@ -103,10 +113,9 @@
 		void panY;
 		void containerWidth;
 		void containerHeight;
-		void geometry;
 
-		// Don't compose until we've fitted to screen at least once
-		if (!hasFitted) return;
+		// Don't compose until we have geometry and have fitted to screen
+		if (!geometry || !hasFitted) return;
 		requestCompose();
 	});
 
@@ -121,7 +130,7 @@
 
 	async function doCompose() {
 		composeRafId = null;
-		if (!canvas || containerWidth === 0 || containerHeight === 0) return;
+		if (!canvas || !geometry || containerWidth === 0 || containerHeight === 0) return;
 		if (isComposing) return; // Prevent concurrent composition
 
 		isComposing = true;
@@ -260,7 +269,7 @@
 	}
 
 	function fitToScreen() {
-		if (containerWidth === 0 || containerHeight === 0) return;
+		if (!geometry || containerWidth === 0 || containerHeight === 0) return;
 
 		const zoomX = containerWidth / geometry.paperWidthMm;
 		const zoomY = containerHeight / geometry.paperHeightMm;
@@ -296,7 +305,7 @@
 	let zoomPercent = $derived(Math.round((zoom / fitZoomLevel()) * 100));
 
 	function fitZoomLevel(): number {
-		if (containerWidth === 0 || containerHeight === 0) return 1;
+		if (!geometry || containerWidth === 0 || containerHeight === 0) return 1;
 		const zoomX = containerWidth / geometry.paperWidthMm;
 		const zoomY = containerHeight / geometry.paperHeightMm;
 		return Math.min(zoomX, zoomY);

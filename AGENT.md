@@ -117,9 +117,34 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - **DPR handling**: Canvas buffer is sized at `containerWidth * dpr × containerHeight * dpr`. The 2D context gets `setTransform(dpr, 0, 0, dpr, 0, 0)` so all drawing coordinates remain in CSS pixels.
 - **Zoom controls**: Mouse wheel (centered on cursor), keyboard (Ctrl/Cmd +/-/0), UI buttons.
 - **Pan controls**: Click and drag.
-- **Fit to screen**: Auto-fit on first load with 10% padding; button for manual fit. Zoom percentage displayed relative to fit level.
+- **Fit to screen**: Auto-fit on first load with NO padding (exact fit); button for manual fit. Zoom percentage displayed relative to fit level.
 - **Zoom range**: MIN_ZOOM = 0.5 px/mm, MAX_ZOOM = 50 px/mm, ZOOM_FACTOR = 1.1 (per step).
 - **Paper background**: White rectangle with subtle drop shadow, drawn by `composeSheet()`. Container background is gray.
+
+## 12.1) Page layout alignment (extra space distribution)
+
+- **Aspect ratio constraint**: Tickets maintain the template image aspect ratio (uniform scaling). This means one axis will hit its limit while the other has extra space.
+- **Ticket sizing formula**:
+  ```
+  ticket_max_width = (paper_width - margin_left - margin_right - (cols-1)*spacing_x) / cols
+  ticket_max_height = (paper_height - margin_top - margin_bottom - (rows-1)*spacing_y) / rows
+  scale = min(ticket_max_width / template_width, ticket_max_height / template_height)
+  ticket_width = scale * template_width
+  ticket_height = scale * template_height
+  ```
+- **Extra space**: One dimension fills available space exactly, the other has leftover space. Alignment controls how this leftover space is distributed.
+- **`top-left`**: 
+  - Left and top margins EXACT as specified.
+  - Spacing EXACT as specified.
+  - Extra space on constrained axis goes to right/bottom margin.
+- **`center`**: 
+  - Spacing EXACT as specified.
+  - Extra space on constrained axis distributed evenly to both margins (centered).
+- **`space-between`**: 
+  - All four margins EXACT as specified (absolute).
+  - Spacing on constrained axis INCREASES to fill all available space.
+  - Extra space distributed evenly between tickets as increased spacing.
+- **Implementation**: `computeSheetGeometry()` is async (loads template to get dimensions). Effective margins/spacing computed in `composeSheet()` based on alignment mode and which axis is constrained.
 
 ## 13) Text rendering in WASM
 

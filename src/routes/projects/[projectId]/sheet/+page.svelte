@@ -27,7 +27,8 @@
 		marginBottom: 10,
 		marginLeft: 10,
 		spacingX: 0,
-		spacingY: 0
+		spacingY: 0,
+		alignment: 'top-left'
 	};
 
 	// Local layout state for immediate preview updates (independent of save)

@@ -27,11 +27,17 @@
 		marginBottom: 10,
 		marginLeft: 10,
 		spacingX: 0,
-		spacingY: 0
+		spacingY: 0,
+		alignment: 'top-left'
 	};
 
 	const form = createForm(() => ({
-		defaultValues: initialData || defaultLayout,
+		defaultValues: {
+			...defaultLayout,
+			...(initialData || {}),
+			// Ensure alignment has a default if missing from initialData
+			alignment: initialData?.alignment || 'top-left'
+		},
 		onSubmit: async ({ value }) => {
 			await onSubmit(value);
 		}
@@ -235,6 +241,44 @@
 							min={0}
 							error={getFieldError(field)}
 						/>
+					{/snippet}
+				</form.Field>
+			</div>
+		</div>
+
+		<!-- Alignment -->
+		<div class="space-y-4 md:col-span-2">
+			<h3 class="text-sm font-semibold tracking-wider text-gray-900 uppercase">Alignment</h3>
+			<div class="space-y-1">
+				<label for="alignment" class="block text-sm font-medium text-gray-700">
+					Extra Space Distribution
+				</label>
+				<form.Field name="alignment">
+					{#snippet children(field)}
+						<select
+							id="alignment"
+							class="block w-full rounded-md border-gray-300 py-2 pr-10 pl-3 text-base focus:border-blue-500 focus:ring-blue-500 focus:outline-none sm:text-sm"
+							value={field.state.value}
+							onchange={(e) => {
+								field.handleChange(
+									e.currentTarget.value as 'top-left' | 'center' | 'space-between'
+								);
+								emitChange();
+							}}
+						>
+							<option value="top-left">Top-Left (exact margins)</option>
+							<option value="center">Center (distribute margins evenly)</option>
+							<option value="space-between">Space Between (distribute spacing evenly)</option>
+						</select>
+						<p class="mt-1 text-xs text-gray-500">
+							{#if field.state.value === 'top-left'}
+								Tickets stacked from top-left with exact margins from settings
+							{:else if field.state.value === 'center'}
+								Grid centered on page, extra space distributed to all margins
+							{:else}
+								Extra space distributed evenly between tickets
+							{/if}
+						</p>
 					{/snippet}
 				</form.Field>
 			</div>
