@@ -86,17 +86,14 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 
 ## 10.1) Per-ticket caching strategy
 
-- **Cache key is ONLY the record value**: Individual tickets are cached based SOLELY on their unique data (number, CSV row, etc.) - NO layout parameters in the key.
-- **Render at template size**: All tickets are rendered at the original template image size, then scaled during composition onto the sheet.
-- **Scale during composition**: When layout changes (ticket size, margins, spacing), cached tickets are scaled to fit - no re-rendering needed.
-- **Cache invalidation**: Cache is cleared only when stamps or template image change (detected via config hash). Layout changes do NOT invalidate the cache.
-- **Performance benefits**:
-  - Layout changes (margins, spacing, rows/cols, ticket dimensions) → instant (cached tickets scaled to new size)
-  - Stamp position changes → instant recomposition from cached tickets
-  - Stamp font/size changes → instant recomposition from cached tickets
-  - Only changing record data → re-render only affected tickets
-- **Implementation**: `wasmPreview.ts` renders tickets individually at template size, then uses canvas `drawImage()` to scale and composite them.
-- **Memory tracking**: Use `getCacheStats()` to monitor cache size and memory usage.
+- **Cache key is ONLY the record value**: `JSON.stringify(record)` — no layout, no dimensions, no stamps.
+- **Render at template size**: Tickets are rendered once at the original template pixel size via WASM, stored as `ImageBitmap`.
+- **Scale during composition**: `composeSheet()` draws cached bitmaps with `drawImage()` scaled to the current zoom/layout. No re-rendering needed for layout or viewport changes.
+- **Cache invalidation**: Flushed only when stamps or template image change (config hash). Layout/viewport changes never invalidate the cache.
+- **Two-phase API**:
+  - `prepareTickets(project)` — async, calls WASM for uncached tickets, returns miss count.
+  - `composeSheet(canvas, geometry, viewport)` — sync, draws only visible cached bitmaps to canvas.
+- **ImageBitmap lifecycle**: `clearTicketCache()` calls `bitmap.close()` to free GPU memory.
 
 ## 11) Scaling discipline (CRITICAL)
 
@@ -110,18 +107,18 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - In WASM/Rust code, only add visual margins (like the 10mm preview border) if they are clearly for preview purposes, not part of the actual document layout.
 - Template images must be scaled isotropically to fit target dimensions calculated from mm measurements.
 
-## 12) Preview zoom functionality
+## 12) Preview rendering & viewport
 
-- All canvas-based previews MUST support zoom/pan controls for detailed inspection.
-- **Zoom controls**: Mouse wheel, keyboard shortcuts (Ctrl/Cmd +/-/0), and UI buttons.
-- **Pan controls**: Click and drag to pan when zoomed in.
-- **Zoom UI**: Display current zoom percentage, zoom in/out buttons, reset button, and fit-to-screen button.
-- **Fit to screen**: MUST auto-fit canvas on initial load with 10% padding; provide button for manual fit.
-- **Zoom centering**: Mouse wheel zoom MUST be centered precisely on cursor position using accurate coordinate transformation (convert cursor to canvas space, then recalculate pan after zoom).
-- **Help text**: Show keyboard/mouse shortcuts in the preview area including fit-to-screen hint.
-- **Transform approach**: Use CSS `transform: scale()` and `translate()` for smooth, GPU-accelerated zoom/pan.
-- **Canvas positioning**: Canvas MUST be `position: absolute` within container with `overflow: hidden` to prevent scrollbars.
-- **Zoom range**: MIN_ZOOM = 0.1 (10%), MAX_ZOOM = 5 (500%), ZOOM_STEP = 0.1 (10%).
+- **Canvas fills container**: Canvas CSS size = container size. Canvas pixel size = container size × devicePixelRatio. No fixed DPI.
+- **Zoom unit is CSS-pixels-per-mm**: `zoom`, `panX`, `panY` are all in CSS pixel space. A paper point at `(mm_x, mm_y)` maps to canvas CSS pixel `(mm_x * zoom + panX, mm_y * zoom + panY)`.
+- **Redraw on every viewport change**: Zoom, pan, resize, and layout changes trigger `requestAnimationFrame` → `composeSheet()`. No CSS transforms — the canvas is redrawn.
+- **Viewport culling**: `composeSheet()` skips tickets whose canvas-space bounding box is entirely outside `[0, 0, cssWidth, cssHeight]`.
+- **DPR handling**: Canvas buffer is sized at `containerWidth * dpr × containerHeight * dpr`. The 2D context gets `setTransform(dpr, 0, 0, dpr, 0, 0)` so all drawing coordinates remain in CSS pixels.
+- **Zoom controls**: Mouse wheel (centered on cursor), keyboard (Ctrl/Cmd +/-/0), UI buttons.
+- **Pan controls**: Click and drag.
+- **Fit to screen**: Auto-fit on first load with 10% padding; button for manual fit. Zoom percentage displayed relative to fit level.
+- **Zoom range**: MIN_ZOOM = 0.5 px/mm, MAX_ZOOM = 50 px/mm, ZOOM_FACTOR = 1.1 (per step).
+- **Paper background**: White rectangle with subtle drop shadow, drawn by `composeSheet()`. Container background is gray.
 
 ## 13) Text rendering in WASM
 

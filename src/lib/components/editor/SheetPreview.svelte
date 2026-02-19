@@ -1,5 +1,20 @@
+<script lang="ts" module>
+	import { getCacheStats } from '$lib/services/wasmPreview';
+
+	function ticketCacheEmpty(): boolean {
+		return getCacheStats().ticketsCached === 0;
+	}
+</script>
+
 <script lang="ts">
-	import { renderWasmPreviewToCanvas, clearTemplateCache } from '$lib/services/wasmPreview';
+	import {
+		prepareTickets,
+		composeSheet,
+		computeSheetGeometry,
+		clearTemplateCache,
+		type Viewport,
+		type SheetGeometry
+	} from '$lib/services/wasmPreview';
 	import type { Project, SheetLayout } from '$lib/types';
 
 	interface Props {
@@ -11,69 +26,28 @@
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
 	let containerRef = $state<HTMLDivElement | null>(null);
-	let isLoading = $state(true);
+	let isPreparing = $state(false);
 	let error = $state<string | null>(null);
-	let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
-	let isFirstRender = $state(true);
+	let hasFitted = $state(false);
 
-	// Zoom state
-	let zoom = $state(1);
+	// Viewport state (canvas pixels)
+	let zoom = $state(1); // canvas-pixels-per-mm
 	let panX = $state(0);
 	let panY = $state(0);
 	let isPanning = $state(false);
-	let lastMouseX = $state(0);
-	let lastMouseY = $state(0);
-	let hasFitted = $state(false);
+	let lastMouseX = 0;
+	let lastMouseY = 0;
 
-	const MIN_ZOOM = 0.1;
-	const MAX_ZOOM = 5;
-	const ZOOM_STEP = 0.1;
+	// Container size tracked by ResizeObserver
+	let containerWidth = $state(0);
+	let containerHeight = $state(0);
 
-	// Generate preview when dependencies change (debounced, direct canvas rendering)
-	$effect(() => {
-		// Track dependencies
-		const deps = {
-			templateImage: project.templateImage,
-			stamps: project.stamps,
-			dataSources: project.dataSources,
-			layout: layout
-		};
+	const MIN_ZOOM = 0.5; // px/mm
+	const MAX_ZOOM = 50; // px/mm
+	const ZOOM_FACTOR = 1.1;
 
-		if (!deps.templateImage || !canvas) {
-			error = null;
-			isLoading = false;
-			if (debounceTimeout) clearTimeout(debounceTimeout);
-			return;
-		}
-
-		// Clear existing timeout
-		if (debounceTimeout) {
-			clearTimeout(debounceTimeout);
-		}
-
-		// Only show loading spinner on first render
-		if (isFirstRender) {
-			isLoading = true;
-		}
-		error = null;
-
-		// Reset fit flag when layout changes
-		hasFitted = false;
-
-		// Debounce the actual preview generation (reduced to 100ms for snappier feel)
-		debounceTimeout = setTimeout(async () => {
-			try {
-				// Render directly to canvas - no PNG encoding overhead!
-				await renderWasmPreviewToCanvas(project, layout, canvas!);
-				isFirstRender = false;
-			} catch (err) {
-				console.error('Failed to generate preview:', err);
-				error = err instanceof Error ? err.message : 'Failed to generate preview';
-			} finally {
-				isLoading = false;
-			}
-		}, 100); // Reduced from 300ms to 100ms - WASM is fast enough
-	});
+	// Cached geometry (recomputed on layout change)
+	let geometry = $derived<SheetGeometry>(computeSheetGeometry(project, layout));
 
 	// Track template changes to clear cache
 	let previousTemplate = $state<Blob | null>(null);
@@ -84,42 +58,141 @@
 		}
 	});
 
-	// Zoom functions
-	function handleWheel(e: WheelEvent) {
-		e.preventDefault();
+	// Prepare tickets (async WASM rendering) when project config changes
+	let prepareGeneration = 0;
+	$effect(() => {
+		// Track dependencies that require re-rendering tickets
+		void project.stamps;
+		void project.templateImage;
+		void project.dataSources;
 
-		if (!canvas || !containerRef) return;
+		if (!project.templateImage) {
+			error = null;
+			isPreparing = false;
+			return;
+		}
 
-		const containerRect = containerRef.getBoundingClientRect();
-		const canvasRect = canvas.getBoundingClientRect();
+		const gen = ++prepareGeneration;
+		isPreparing = true;
+		error = null;
 
-		// Mouse position relative to container
-		const mouseX = e.clientX - containerRect.left;
-		const mouseY = e.clientY - containerRect.top;
+		prepareTickets(project)
+			.then(() => {
+				if (gen !== prepareGeneration) return; // stale
+				isPreparing = false;
+				if (!hasFitted) {
+					fitToScreen();
+					hasFitted = true;
+				}
+				requestCompose();
+			})
+			.catch((err) => {
+				if (gen !== prepareGeneration) return;
+				isPreparing = false;
+				console.error('Failed to prepare tickets:', err);
+				error = err instanceof Error ? err.message : 'Failed to render tickets';
+			});
+	});
 
-		// Canvas position relative to container (accounting for current transform)
-		const canvasLeft = canvasRect.left - containerRect.left;
-		const canvasTop = canvasRect.top - containerRect.top;
+	// Recompose when layout or viewport changes (synchronous, fast)
+	$effect(() => {
+		// Track layout + viewport dependencies
+		void layout;
+		void zoom;
+		void panX;
+		void panY;
+		void containerWidth;
+		void containerHeight;
+		void geometry;
 
-		// Point on canvas before zoom (in canvas coordinate space)
-		const canvasPointX = (mouseX - canvasLeft) / zoom;
-		const canvasPointY = (mouseY - canvasTop) / zoom;
+		requestCompose();
+	});
 
-		// Calculate new zoom
-		const delta = -e.deltaY * 0.001;
-		const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom + delta));
+	// requestAnimationFrame dedup
+	let composeRafId: number | null = null;
 
-		if (newZoom !== zoom) {
-			// Calculate new pan to keep the point under the mouse stationary
-			panX = mouseX - canvasPointX * newZoom;
-			panY = mouseY - canvasPointY * newZoom;
-			zoom = newZoom;
+	function requestCompose() {
+		if (composeRafId !== null) return;
+		composeRafId = requestAnimationFrame(doCompose);
+	}
+
+	function doCompose() {
+		composeRafId = null;
+		if (!canvas || containerWidth === 0 || containerHeight === 0) return;
+
+		// Resize canvas to match container (CSS pixels → device pixels for sharpness)
+		const dpr = window.devicePixelRatio || 1;
+		const cw = Math.round(containerWidth * dpr);
+		const ch = Math.round(containerHeight * dpr);
+
+		if (canvas.width !== cw || canvas.height !== ch) {
+			canvas.width = cw;
+			canvas.height = ch;
+		}
+
+		const ctx = canvas.getContext('2d', { alpha: false });
+		if (!ctx) return;
+
+		// Scale context for device pixel ratio
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+		const viewport: Viewport = {
+			zoom,
+			panX,
+			panY,
+			cssWidth: containerWidth,
+			cssHeight: containerHeight
+		};
+
+		try {
+			composeSheet(canvas, geometry, viewport);
+		} catch (err) {
+			console.error('Compose error:', err);
 		}
 	}
 
+	// --- ResizeObserver ---
+	$effect(() => {
+		if (!containerRef) return;
+
+		const observer = new ResizeObserver((entries) => {
+			for (const entry of entries) {
+				containerWidth = entry.contentRect.width;
+				containerHeight = entry.contentRect.height;
+			}
+		});
+		observer.observe(containerRef);
+
+		return () => observer.disconnect();
+	});
+
+	// --- Zoom (mouse wheel) ---
+	function handleWheel(e: WheelEvent) {
+		e.preventDefault();
+		if (!containerRef) return;
+
+		const rect = containerRef.getBoundingClientRect();
+		// Mouse position relative to container (CSS pixels)
+		const mx = e.clientX - rect.left;
+		const my = e.clientY - rect.top;
+
+		// Paper point under cursor (in mm)
+		const paperX = (mx - panX) / zoom;
+		const paperY = (my - panY) / zoom;
+
+		// New zoom
+		const direction = e.deltaY < 0 ? 1 : -1;
+		const newZoom = clampZoom(zoom * Math.pow(ZOOM_FACTOR, direction));
+
+		// Adjust pan so the paper point stays under cursor
+		panX = mx - paperX * newZoom;
+		panY = my - paperY * newZoom;
+		zoom = newZoom;
+	}
+
+	// --- Pan (mouse drag) ---
 	function handleMouseDown(e: MouseEvent) {
 		if (e.button === 0) {
-			// Left click
 			isPanning = true;
 			lastMouseX = e.clientX;
 			lastMouseY = e.clientY;
@@ -128,151 +201,103 @@
 	}
 
 	function handleMouseMove(e: MouseEvent) {
-		if (isPanning) {
-			const deltaX = e.clientX - lastMouseX;
-			const deltaY = e.clientY - lastMouseY;
-			panX += deltaX;
-			panY += deltaY;
-			lastMouseX = e.clientX;
-			lastMouseY = e.clientY;
-		}
+		if (!isPanning) return;
+		const dx = e.clientX - lastMouseX;
+		const dy = e.clientY - lastMouseY;
+		panX += dx;
+		panY += dy;
+		lastMouseX = e.clientX;
+		lastMouseY = e.clientY;
 	}
 
 	function handleMouseUp() {
 		isPanning = false;
 	}
 
+	// --- Keyboard shortcuts ---
 	function handleKeyDown(e: KeyboardEvent) {
-		// Zoom in: Ctrl/Cmd + Plus/Equals
 		if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
 			e.preventDefault();
 			zoomIn();
-		}
-		// Zoom out: Ctrl/Cmd + Minus
-		else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+		} else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
 			e.preventDefault();
 			zoomOut();
-		}
-		// Reset zoom: Ctrl/Cmd + 0
-		else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+		} else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
 			e.preventDefault();
-			resetZoom();
+			fitToScreen();
 		}
+	}
+
+	function clampZoom(z: number): number {
+		return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+	}
+
+	function zoomToCenter(factor: number) {
+		const cx = containerWidth / 2;
+		const cy = containerHeight / 2;
+		const paperX = (cx - panX) / zoom;
+		const paperY = (cy - panY) / zoom;
+		const newZoom = clampZoom(zoom * factor);
+		panX = cx - paperX * newZoom;
+		panY = cy - paperY * newZoom;
+		zoom = newZoom;
 	}
 
 	function zoomIn() {
-		if (!canvas || !containerRef) return;
-
-		const containerRect = containerRef.getBoundingClientRect();
-
-		// Zoom towards center of container
-		const centerX = containerRect.width / 2;
-		const centerY = containerRect.height / 2;
-
-		const canvasRect = canvas.getBoundingClientRect();
-		const canvasLeft = canvasRect.left - containerRect.left;
-		const canvasTop = canvasRect.top - containerRect.top;
-
-		const canvasPointX = (centerX - canvasLeft) / zoom;
-		const canvasPointY = (centerY - canvasTop) / zoom;
-
-		const newZoom = Math.min(MAX_ZOOM, zoom + ZOOM_STEP);
-
-		panX = centerX - canvasPointX * newZoom;
-		panY = centerY - canvasPointY * newZoom;
-		zoom = newZoom;
+		zoomToCenter(ZOOM_FACTOR);
 	}
 
 	function zoomOut() {
-		if (!canvas || !containerRef) return;
-
-		const containerRect = containerRef.getBoundingClientRect();
-
-		// Zoom towards center of container
-		const centerX = containerRect.width / 2;
-		const centerY = containerRect.height / 2;
-
-		const canvasRect = canvas.getBoundingClientRect();
-		const canvasLeft = canvasRect.left - containerRect.left;
-		const canvasTop = canvasRect.top - containerRect.top;
-
-		const canvasPointX = (centerX - canvasLeft) / zoom;
-		const canvasPointY = (centerY - canvasTop) / zoom;
-
-		const newZoom = Math.max(MIN_ZOOM, zoom - ZOOM_STEP);
-
-		panX = centerX - canvasPointX * newZoom;
-		panY = centerY - canvasPointY * newZoom;
-		zoom = newZoom;
-	}
-
-	function resetZoom() {
-		fitToScreen();
+		zoomToCenter(1 / ZOOM_FACTOR);
 	}
 
 	function fitToScreen() {
-		if (!canvas || !containerRef) return;
+		if (containerWidth === 0 || containerHeight === 0) return;
 
-		const containerRect = containerRef.getBoundingClientRect();
-		const canvasWidth = canvas.width;
-		const canvasHeight = canvas.height;
-
-		if (canvasWidth === 0 || canvasHeight === 0) return;
-
-		// Add some padding (10% on each side)
 		const padding = 0.9;
-		const containerWidth = containerRect.width * padding;
-		const containerHeight = containerRect.height * padding;
+		const availW = containerWidth * padding;
+		const availH = containerHeight * padding;
 
-		// Calculate scale to fit
-		const scaleX = containerWidth / canvasWidth;
-		const scaleY = containerHeight / canvasHeight;
-		const newZoom = Math.min(scaleX, scaleY);
+		const zoomX = availW / geometry.paperWidthMm;
+		const zoomY = availH / geometry.paperHeightMm;
+		const newZoom = clampZoom(Math.min(zoomX, zoomY));
 
-		// Clamp zoom to valid range
-		const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+		const paperW = geometry.paperWidthMm * newZoom;
+		const paperH = geometry.paperHeightMm * newZoom;
 
-		// Center the canvas
-		const scaledWidth = canvasWidth * clampedZoom;
-		const scaledHeight = canvasHeight * clampedZoom;
-
-		panX = (containerRect.width - scaledWidth) / 2;
-		panY = (containerRect.height - scaledHeight) / 2;
-		zoom = clampedZoom;
+		panX = (containerWidth - paperW) / 2;
+		panY = (containerHeight - paperH) / 2;
+		zoom = newZoom;
 	}
 
-	// Setup keyboard listeners
+	// --- Global event listeners ---
 	$effect(() => {
 		document.addEventListener('keydown', handleKeyDown);
-		return () => {
-			document.removeEventListener('keydown', handleKeyDown);
-		};
+		return () => document.removeEventListener('keydown', handleKeyDown);
 	});
 
-	// Cleanup mouse listeners on unmount
 	$effect(() => {
-		const handleGlobalMouseUp = () => {
+		const up = () => {
 			isPanning = false;
 		};
-		document.addEventListener('mouseup', handleGlobalMouseUp);
-		document.addEventListener('mouseleave', handleGlobalMouseUp);
+		document.addEventListener('mouseup', up);
+		document.addEventListener('mouseleave', up);
 		return () => {
-			document.removeEventListener('mouseup', handleGlobalMouseUp);
-			document.removeEventListener('mouseleave', handleGlobalMouseUp);
+			document.removeEventListener('mouseup', up);
+			document.removeEventListener('mouseleave', up);
 		};
 	});
 
-	// Fit to screen when canvas first loads or updates (debounced)
-	$effect(() => {
-		if (canvas && canvas.width > 0 && canvas.height > 0 && !isLoading && !hasFitted) {
-			// Small delay to ensure canvas is fully rendered
-			const timer = setTimeout(() => {
-				fitToScreen();
-				hasFitted = true;
-			}, 150);
-			return () => clearTimeout(timer);
-		}
-	});
+	// Zoom percentage for display
+	let zoomPercent = $derived(Math.round((zoom / fitZoomLevel()) * 100));
+
+	function fitZoomLevel(): number {
+		if (containerWidth === 0 || containerHeight === 0) return 1;
+		const padding = 0.9;
+		const zoomX = (containerWidth * padding) / geometry.paperWidthMm;
+		const zoomY = (containerHeight * padding) / geometry.paperHeightMm;
+		return Math.min(zoomX, zoomY);
+	}
 </script>
 
 <div class="relative flex h-full flex-col bg-gray-100">
@@ -297,10 +322,10 @@
 			<button
 				type="button"
 				class="block h-10 w-10 border-b border-gray-200 text-gray-700 transition-colors hover:bg-gray-50"
-				onclick={resetZoom}
+				onclick={() => fitToScreen()}
 				title="Reset zoom (Ctrl/Cmd + 0)"
 			>
-				<span class="text-xs font-medium">{Math.round(zoom * 100)}%</span>
+				<span class="text-xs font-medium">{zoomPercent}%</span>
 			</button>
 			<button
 				type="button"
@@ -315,7 +340,7 @@
 			<button
 				type="button"
 				class="block h-10 w-10 text-gray-700 transition-colors hover:bg-gray-50"
-				onclick={fitToScreen}
+				onclick={() => fitToScreen()}
 				title="Fit to screen"
 			>
 				<svg class="mx-auto h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -339,14 +364,13 @@
 		<p><strong>Fit:</strong> Click fit button or Ctrl/Cmd 0</p>
 	</div>
 
-	{#if isLoading && isFirstRender}
-		<!-- Only show spinner on first load, not on updates -->
+	{#if isPreparing && ticketCacheEmpty()}
 		<div class="absolute inset-0 z-10 flex items-center justify-center bg-gray-100">
 			<div class="text-center">
 				<div
 					class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"
 				></div>
-				<p class="mt-4 text-sm text-gray-600">Generating preview...</p>
+				<p class="mt-4 text-sm text-gray-600">Rendering tickets…</p>
 			</div>
 		</div>
 	{/if}
@@ -360,10 +384,10 @@
 		</div>
 	{/if}
 
-	<!-- Canvas container with zoom/pan -->
+	<!-- Canvas container -->
 	<div
 		bind:this={containerRef}
-		class="relative flex h-full w-full items-center justify-center overflow-hidden"
+		class="h-full w-full overflow-hidden"
 		style="cursor: {isPanning ? 'grabbing' : 'grab'};"
 		onwheel={handleWheel}
 		onmousedown={handleMouseDown}
@@ -373,12 +397,11 @@
 		aria-label="Sheet preview"
 		tabindex="-1"
 	>
-		<!-- Canvas positioned absolutely within container -->
 		<canvas
 			bind:this={canvas}
-			class="absolute"
-			class:opacity-50={isLoading && !isFirstRender}
-			style="transform: translate({panX}px, {panY}px) scale({zoom}); transform-origin: 0 0; image-rendering: auto; left: 0; top: 0; transition: opacity 0.2s;"
+			class="block h-full w-full"
+			class:opacity-60={isPreparing}
+			style="image-rendering: auto; transition: opacity 0.15s;"
 		></canvas>
 	</div>
 </div>

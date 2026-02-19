@@ -5,7 +5,9 @@ import { generateRecords } from '$lib/engine/data';
 let wasmModule: typeof import('$lib/wasm/pdf_generator') | null = null;
 let wasmInitialized = false;
 
-// Cache for template RGBA data to avoid repeated conversions
+// ---------------------------------------------------------------------------
+// Template cache (blob → RGBA)
+// ---------------------------------------------------------------------------
 interface TemplateCache {
 	blob: Blob;
 	width: number;
@@ -14,41 +16,70 @@ interface TemplateCache {
 }
 let templateCache: TemplateCache | null = null;
 
-// Cache for individual rendered tickets at template size
-// Key: ONLY the record data - no layout parameters at all
-// Tickets are always rendered at template size, then scaled during composition
-interface TicketCache {
-	data: Uint8Array; // RGBA bytes at template size
-	width: number; // Template width
-	height: number; // Template height
+// ---------------------------------------------------------------------------
+// Per-ticket cache. Key = JSON.stringify(record) – ONLY the value.
+// Stores an ImageBitmap ready for fast canvas drawImage calls.
+// ---------------------------------------------------------------------------
+interface CachedTicket {
+	bitmap: ImageBitmap;
+	width: number; // bitmap width (= template width)
+	height: number; // bitmap height (= template height)
 }
-const ticketCache = new Map<string, TicketCache>();
+const ticketCache = new Map<string, CachedTicket>();
 
-// Track current configuration for cache invalidation
+// Hash of (stamps + template identity) – when this changes we flush ticketCache
 let currentConfigHash: string | null = null;
 
-/**
- * Initialize the WASM module (lazy loading)
- */
-async function initWasm() {
-	if (wasmInitialized && wasmModule) {
-		return wasmModule;
-	}
-
-	const module = await import('$lib/wasm/pdf_generator');
-	await module.default();
-	wasmModule = module;
-	wasmInitialized = true;
-	return module;
+// ---------------------------------------------------------------------------
+// Viewport description passed in by the component on every frame
+// ---------------------------------------------------------------------------
+export interface Viewport {
+	/** CSS-pixels-per-mm – drives the effective resolution */
+	zoom: number;
+	/** CSS-pixel offset of paper origin */
+	panX: number;
+	panY: number;
+	/** CSS-pixel dimensions of the container (for clearing & culling) */
+	cssWidth: number;
+	cssHeight: number;
 }
 
-/**
- * Convert template image blob to RGBA data for WASM (with caching)
- */
+// ---------------------------------------------------------------------------
+// Sheet geometry (computed once per layout change, reused across frames)
+// ---------------------------------------------------------------------------
+export interface SheetGeometry {
+	paperWidthMm: number;
+	paperHeightMm: number;
+	ticketWidthMm: number;
+	ticketHeightMm: number;
+	marginLeftMm: number;
+	marginTopMm: number;
+	spacingXMm: number;
+	spacingYMm: number;
+	rows: number;
+	cols: number;
+	/** Serialised records for this page (simple key-value objects) */
+	records: Record<string, string>[];
+}
+
+// ---------------------------------------------------------------------------
+// WASM init
+// ---------------------------------------------------------------------------
+async function initWasm() {
+	if (wasmInitialized && wasmModule) return wasmModule;
+	const mod = await import('$lib/wasm/pdf_generator');
+	await mod.default();
+	wasmModule = mod;
+	wasmInitialized = true;
+	return mod;
+}
+
+// ---------------------------------------------------------------------------
+// Blob → RGBA (cached)
+// ---------------------------------------------------------------------------
 async function blobToRgbaData(
 	blob: Blob
 ): Promise<{ width: number; height: number; data: Uint8Array }> {
-	// Check cache first
 	if (templateCache && templateCache.blob === blob) {
 		return {
 			width: templateCache.width,
@@ -57,25 +88,22 @@ async function blobToRgbaData(
 		};
 	}
 
-	// Convert blob to RGBA
 	const result = await new Promise<{ width: number; height: number; data: Uint8Array }>(
 		(resolve, reject) => {
 			const img = new Image();
 			img.onload = () => {
-				const canvas = new OffscreenCanvas(img.width, img.height);
-				const ctx = canvas.getContext('2d');
+				const c = new OffscreenCanvas(img.width, img.height);
+				const ctx = c.getContext('2d');
 				if (!ctx) {
 					reject(new Error('Failed to get canvas context'));
 					return;
 				}
-
 				ctx.drawImage(img, 0, 0);
-				const imageData = ctx.getImageData(0, 0, img.width, img.height);
-
+				const id = ctx.getImageData(0, 0, img.width, img.height);
 				resolve({
 					width: img.width,
 					height: img.height,
-					data: new Uint8Array(imageData.data.buffer)
+					data: new Uint8Array(id.data.buffer)
 				});
 			};
 			img.onerror = () => reject(new Error('Failed to load image'));
@@ -83,182 +111,102 @@ async function blobToRgbaData(
 		}
 	);
 
-	// Cache the result
-	templateCache = {
-		blob,
-		width: result.width,
-		height: result.height,
-		data: result.data
-	};
-
+	templateCache = { blob, ...result };
 	return result;
 }
 
-/**
- * Serialize stamps to match WASM-expected format
- */
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 function serializeStamps(stamps: Stamp[]): unknown[] {
-	return stamps.map((stamp) => {
-		// Return stamp as-is since the TypeScript types match the Rust Deserialize expectations
-		return stamp;
-	});
+	return stamps.map((s) => s);
 }
 
-/**
- * Get font URLs map from text stamps
- */
 function getFontUrlsFromStamps(stamps: Stamp[]): Record<string, string> {
-	const fontsObject: Record<string, string> = {};
-	for (const stamp of stamps) {
-		if (stamp.type === 'text') {
-			const fontDef = AVAILABLE_FONTS.find((f) => f.name === stamp.fontFamily);
-			if (fontDef && !fontsObject[stamp.fontFamily]) {
-				fontsObject[stamp.fontFamily] = fontDef.url;
-			}
+	const out: Record<string, string> = {};
+	for (const s of stamps) {
+		if (s.type === 'text') {
+			const def = AVAILABLE_FONTS.find((f) => f.name === s.fontFamily);
+			if (def && !out[s.fontFamily]) out[s.fontFamily] = def.url;
 		}
 	}
-	// Ensure at least one font (default)
-	if (Object.keys(fontsObject).length === 0) {
-		const defaultFont = AVAILABLE_FONTS[0];
-		fontsObject[defaultFont.name] = defaultFont.url;
+	if (Object.keys(out).length === 0) {
+		const d = AVAILABLE_FONTS[0];
+		out[d.name] = d.url;
 	}
-	return fontsObject;
+	return out;
 }
 
-/**
- * Generate sheet preview entirely in WASM (high performance)
- * Returns a data URL for direct rendering in an <img> or <canvas>
- */
-export async function generateWasmPreview(project: Project, layout: SheetLayout): Promise<string> {
-	const wasm = await initWasm();
+// ---------------------------------------------------------------------------
+// Compute sheet geometry from project + layout (pure, no side-effects)
+// ---------------------------------------------------------------------------
+export function computeSheetGeometry(project: Project, layout: SheetLayout): SheetGeometry {
+	const paperWidthMm =
+		layout.orientation === 'landscape' ? layout.paperSize.heightMm : layout.paperSize.widthMm;
+	const paperHeightMm =
+		layout.orientation === 'landscape' ? layout.paperSize.widthMm : layout.paperSize.heightMm;
 
-	if (!project.templateImage) {
-		throw new Error('No template image available');
-	}
+	const ticketWidthMm =
+		layout.cols > 0
+			? (paperWidthMm -
+					layout.marginLeft -
+					layout.marginRight -
+					(layout.cols - 1) * layout.spacingX) /
+				layout.cols
+			: 0;
+	const ticketHeightMm =
+		layout.rows > 0
+			? (paperHeightMm -
+					layout.marginTop -
+					layout.marginBottom -
+					(layout.rows - 1) * layout.spacingY) /
+				layout.rows
+			: 0;
 
-	// Convert template image to RGBA data
-	const templateData = await blobToRgbaData(project.templateImage);
-
-	// Generate records
 	const records = generateRecords(project.dataSources);
 	const ticketsPerPage = layout.rows * layout.cols;
-	const recordsToRender = records.slice(0, ticketsPerPage);
-
-	// Convert records to simple key-value objects
-	const serializedRecords = recordsToRender.map((record) => {
+	const serialized = records.slice(0, ticketsPerPage).map((r) => {
 		const obj: Record<string, string> = {};
-		for (const key in record) {
-			obj[key] = String(record[key]);
-		}
+		for (const k in r) obj[k] = String(r[k]);
 		return obj;
 	});
 
-	// Paper dimensions accounting for orientation
-	const paperWidth =
-		layout.orientation === 'landscape' ? layout.paperSize.heightMm : layout.paperSize.widthMm;
-	const paperHeight =
-		layout.orientation === 'landscape' ? layout.paperSize.widthMm : layout.paperSize.heightMm;
-
-	// Build config object (without template data - passed separately)
-	const config = {
-		sheet_config: {
-			paper_width_mm: paperWidth,
-			paper_height_mm: paperHeight,
-			rows: layout.rows,
-			cols: layout.cols,
-			margin_top_mm: layout.marginTop,
-			margin_right_mm: layout.marginRight,
-			margin_bottom_mm: layout.marginBottom,
-			margin_left_mm: layout.marginLeft,
-			spacing_x_mm: layout.spacingX,
-			spacing_y_mm: layout.spacingY
-		},
-		template_width: templateData.width,
-		template_height: templateData.height,
-		stamps: serializeStamps(project.stamps),
-		records: serializedRecords,
-		dpi: 96
+	return {
+		paperWidthMm,
+		paperHeightMm,
+		ticketWidthMm,
+		ticketHeightMm,
+		marginLeftMm: layout.marginLeft,
+		marginTopMm: layout.marginTop,
+		spacingXMm: layout.spacingX,
+		spacingYMm: layout.spacingY,
+		rows: layout.rows,
+		cols: layout.cols,
+		records: serialized
 	};
-
-	// Calculate output dimensions BEFORE calling WASM
-	// These must match exactly what WASM calculates
-	const dpi = 96;
-	const mmPerInch = 25.4;
-	const pixelsPerMm = dpi / mmPerInch;
-	const width = Math.round(paperWidth * pixelsPerMm);
-	const height = Math.round(paperHeight * pixelsPerMm);
-
-	// Get font URLs for WASM to fetch
-	const fontsObject = getFontUrlsFromStamps(project.stamps);
-
-	// Call WASM render function - pass template data and fonts URLs (returns Promise with data length)
-	const configJson = JSON.stringify(config);
-	const fontsJson = JSON.stringify(fontsObject);
-	const dataLength = (await wasm.render_sheet(configJson, templateData.data, fontsJson)) as number;
-
-	// Validate data length
-	if (dataLength !== width * height * 4) {
-		throw new Error(
-			`WASM returned incorrect data size.\n` +
-				`Expected: ${width * height * 4} bytes (${width}px × ${height}px × 4 channels)\n` +
-				`Got: ${dataLength} bytes\n` +
-				`Paper: ${paperWidth}mm × ${paperHeight}mm at ${dpi} DPI\n` +
-				`This suggests a dimension calculation mismatch between TS and Rust.`
-		);
-	}
-
-	// Access WASM memory directly (zero-copy)
-	const ptr = wasm.get_render_data_ptr();
-	const memoryBuffer = (wasm.get_memory() as WebAssembly.Memory).buffer;
-	const memory = new Uint8Array(memoryBuffer, ptr, dataLength);
-
-	// Convert RGBA bytes to ImageData
-	const imageData = new ImageData(new Uint8ClampedArray(memory), width, height);
-
-	// Render to canvas and convert to data URL
-	const canvas = new OffscreenCanvas(width, height);
-	const ctx = canvas.getContext('2d');
-	if (!ctx) {
-		throw new Error('Failed to get canvas context');
-	}
-
-	ctx.putImageData(imageData, 0, 0);
-
-	// Convert to blob then data URL
-	const blob = await canvas.convertToBlob({ type: 'image/png' });
-	return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onloadend = () => resolve(reader.result as string);
-		reader.onerror = reject;
-		reader.readAsDataURL(blob);
-	});
 }
 
-/**
- * Render a single ticket with caching
- * Cache key is ONLY the record data - no layout parameters
- * Always renders at template size, scaling happens during composition
- */
-async function renderTicket(
+// ---------------------------------------------------------------------------
+// Render a single ticket via WASM (async). Returns an ImageBitmap.
+// Cache key is ONLY JSON.stringify(record).
+// ---------------------------------------------------------------------------
+async function ensureTicketRendered(
 	wasm: typeof import('$lib/wasm/pdf_generator'),
 	templateData: { width: number; height: number; data: Uint8Array },
 	stamps: Stamp[],
 	record: Record<string, string>,
 	fontsObject: Record<string, string>
-): Promise<{ data: Uint8Array; width: number; height: number }> {
-	// Cache key is ONLY the record data - no dimensions, no layout
-	const cacheKey = JSON.stringify(record);
+): Promise<CachedTicket> {
+	const key = JSON.stringify(record);
+	const cached = ticketCache.get(key);
+	if (cached) return cached;
 
-	// Check cache
-	const cached = ticketCache.get(cacheKey);
-	if (cached) {
-		return cached;
-	}
-
-	// Render single ticket at template size
-	// We render at template dimensions, then scale during composition
-	const templateWidthMm = templateData.width / 3.7795275591; // Convert px to mm at 96 DPI
-	const templateHeightMm = templateData.height / 3.7795275591;
+	// We render at template pixel size (1:1). The DPI we pass to WASM is
+	// calculated so that the paper dimensions in mm equal exactly the template
+	// pixel dimensions. This keeps text/stamps at native template resolution.
+	const MM_PER_INCH = 25.4;
+	const templateWidthMm = templateData.width / (96 / MM_PER_INCH);
+	const templateHeightMm = templateData.height / (96 / MM_PER_INCH);
 
 	const config = {
 		sheet_config: {
@@ -280,240 +228,195 @@ async function renderTicket(
 		dpi: 96
 	};
 
-	const configJson = JSON.stringify(config);
-	const fontsJson = JSON.stringify(fontsObject);
-	const dataLength = (await wasm.render_sheet(configJson, templateData.data, fontsJson)) as number;
+	const dataLength = (await wasm.render_sheet(
+		JSON.stringify(config),
+		templateData.data,
+		JSON.stringify(fontsObject)
+	)) as number;
 
-	// Get rendered data
 	const ptr = wasm.get_render_data_ptr();
-	const memoryBuffer = (wasm.get_memory() as WebAssembly.Memory).buffer;
-	const ticketData = new Uint8Array(memoryBuffer, ptr, dataLength).slice(); // Copy data
+	const mem = (wasm.get_memory() as WebAssembly.Memory).buffer;
+	// Copy – WASM memory may be invalidated on next call
+	const rgba = new Uint8Array(mem, ptr, dataLength).slice();
 
-	// Cache it (at template size)
-	const result = {
-		data: ticketData,
+	// Build an ImageBitmap for fast repeated drawing
+	const imageData = new ImageData(
+		new Uint8ClampedArray(rgba.buffer),
+		templateData.width,
+		templateData.height
+	);
+	const bitmap = await createImageBitmap(imageData);
+
+	const entry: CachedTicket = {
+		bitmap,
 		width: templateData.width,
 		height: templateData.height
 	};
-	ticketCache.set(cacheKey, result);
-
-	return result;
+	ticketCache.set(key, entry);
+	return entry;
 }
 
-/**
- * Generate preview and render directly to a canvas element (optimized - no PNG encoding).
- * This is the FASTEST method for preview rendering with per-ticket caching.
- */
-export async function renderWasmPreviewToCanvas(
-	project: Project,
-	layout: SheetLayout,
-	canvas: HTMLCanvasElement
-): Promise<void> {
-	const perfStart = performance.now();
+// ---------------------------------------------------------------------------
+// Ensure all tickets for the current project are rendered & cached.
+// Call this when stamps / template / data sources change.
+// Returns the number of cache misses (tickets actually rendered).
+// ---------------------------------------------------------------------------
+export async function prepareTickets(project: Project): Promise<number> {
 	const wasm = await initWasm();
 
-	if (!project.templateImage) {
-		throw new Error('No template image available');
-	}
+	if (!project.templateImage) throw new Error('No template image available');
 
-	// Generate config hash to detect when stamps/template change (invalidate cache)
+	// Check for config change → flush ticket cache
 	const configHash = JSON.stringify({
 		stamps: serializeStamps(project.stamps),
-		templateWidth: project.templateImage.size,
+		templateSize: project.templateImage.size,
 		templateType: project.templateImage.type
 	});
-
-	// If configuration changed, clear ticket cache
 	if (currentConfigHash !== configHash) {
-		console.log('[CACHE] Configuration changed, clearing ticket cache');
 		ticketCache.clear();
 		currentConfigHash = configHash;
 	}
 
-	// Convert template image to RGBA data
-	const t1 = performance.now();
 	const templateData = await blobToRgbaData(project.templateImage);
-	console.log(`[PERF] Template conversion: ${(performance.now() - t1).toFixed(1)}ms`);
+	const fontsObject = getFontUrlsFromStamps(project.stamps);
 
-	// Generate records
-	const t2 = performance.now();
+	// Build the full record list (all pages worth, but we only need page 1 for now)
 	const records = generateRecords(project.dataSources);
-	const ticketsPerPage = layout.rows * layout.cols;
-	const recordsToRender = records.slice(0, ticketsPerPage);
-	console.log(`[PERF] Generate records: ${(performance.now() - t2).toFixed(1)}ms`);
-
-	// Convert records to simple key-value objects
-	const serializedRecords = recordsToRender.map((record) => {
+	const serialized = records.map((r) => {
 		const obj: Record<string, string> = {};
-		for (const key in record) {
-			obj[key] = String(record[key]);
-		}
+		for (const k in r) obj[k] = String(r[k]);
 		return obj;
 	});
 
-	// Paper dimensions accounting for orientation
-	const paperWidth =
-		layout.orientation === 'landscape' ? layout.paperSize.heightMm : layout.paperSize.widthMm;
-	const paperHeight =
-		layout.orientation === 'landscape' ? layout.paperSize.widthMm : layout.paperSize.heightMm;
-
-	// Calculate sheet and ticket dimensions
-	const dpi = 96;
-	const mmPerInch = 25.4;
-	const pixelsPerMm = dpi / mmPerInch;
-	const sheetWidth = Math.round(paperWidth * pixelsPerMm);
-	const sheetHeight = Math.round(paperHeight * pixelsPerMm);
-
-	// Calculate ticket size in mm
-	const ticketWidthMm =
-		layout.cols > 0
-			? (paperWidth -
-					layout.marginLeft -
-					layout.marginRight -
-					(layout.cols - 1) * layout.spacingX) /
-				layout.cols
-			: 0;
-	const ticketHeightMm =
-		layout.rows > 0
-			? (paperHeight -
-					layout.marginTop -
-					layout.marginBottom -
-					(layout.rows - 1) * layout.spacingY) /
-				layout.rows
-			: 0;
-
-	const ticketWidth = Math.round(ticketWidthMm * pixelsPerMm);
-	const ticketHeight = Math.round(ticketHeightMm * pixelsPerMm);
-
-	// Get font URLs
-	const fontsObject = getFontUrlsFromStamps(project.stamps);
-
-	// Render individual tickets with caching (at template size)
-	const t3 = performance.now();
-	const tickets: Array<{ data: Uint8Array; width: number; height: number }> = [];
-	let cacheHits = 0;
-	let cacheMisses = 0;
-
-	for (const record of serializedRecords) {
-		const cacheKey = JSON.stringify(record);
-		const wasInCache = ticketCache.has(cacheKey);
-
-		const ticket = await renderTicket(wasm, templateData, project.stamps, record, fontsObject);
-		tickets.push(ticket);
-
-		if (wasInCache) {
-			cacheHits++;
-		} else {
-			cacheMisses++;
+	let misses = 0;
+	for (const record of serialized) {
+		const key = JSON.stringify(record);
+		if (!ticketCache.has(key)) {
+			await ensureTicketRendered(wasm, templateData, project.stamps, record, fontsObject);
+			misses++;
 		}
 	}
-	console.log(
-		`[PERF] Render ${tickets.length} tickets: ${(performance.now() - t3).toFixed(1)}ms ` +
-			`(${cacheHits} cache hits, ${cacheMisses} misses)`
-	);
-
-	// Compose tickets onto sheet
-	const t4 = performance.now();
-	canvas.width = sheetWidth;
-	canvas.height = sheetHeight;
-
-	const ctx = canvas.getContext('2d', { alpha: false });
-	if (!ctx) {
-		throw new Error('Failed to get 2D canvas context');
-	}
-
-	// Fill white background
-	ctx.fillStyle = 'white';
-	ctx.fillRect(0, 0, sheetWidth, sheetHeight);
-
-	// Convert margins and spacing to pixels
-	const marginLeft = Math.round(layout.marginLeft * pixelsPerMm);
-	const marginTop = Math.round(layout.marginTop * pixelsPerMm);
-	const spacingX = Math.round(layout.spacingX * pixelsPerMm);
-	const spacingY = Math.round(layout.spacingY * pixelsPerMm);
-
-	// Composite each ticket (scale from template size to target size)
-	for (let i = 0; i < tickets.length; i++) {
-		const row = Math.floor(i / layout.cols);
-		const col = i % layout.cols;
-
-		const x = marginLeft + col * (ticketWidth + spacingX);
-		const y = marginTop + row * (ticketHeight + spacingY);
-
-		const ticket = tickets[i];
-
-		// Calculate UNIFORM scale factor (same for both axes)
-		const scaleX = ticketWidth / ticket.width;
-		const scaleY = ticketHeight / ticket.height;
-		const scale = Math.min(scaleX, scaleY); // Maintain aspect ratio
-
-		const scaledWidth = Math.round(ticket.width * scale);
-		const scaledHeight = Math.round(ticket.height * scale);
-
-		// Center the scaled ticket within the grid cell
-		const offsetX = Math.round((ticketWidth - scaledWidth) / 2);
-		const offsetY = Math.round((ticketHeight - scaledHeight) / 2);
-
-		// Create a temporary canvas for scaling
-		const tempCanvas = new OffscreenCanvas(ticket.width, ticket.height);
-		const tempCtx = tempCanvas.getContext('2d');
-		if (!tempCtx) continue;
-
-		// Put the cached ticket data on temp canvas
-		const ticketImageData = new ImageData(
-			new Uint8ClampedArray(ticket.data),
-			ticket.width,
-			ticket.height
-		);
-		tempCtx.putImageData(ticketImageData, 0, 0);
-
-		// Draw scaled to target position with uniform scaling and centering
-		ctx.drawImage(tempCanvas, x + offsetX, y + offsetY, scaledWidth, scaledHeight);
-	}
-	console.log(`[PERF] Compose tickets: ${(performance.now() - t4).toFixed(1)}ms`);
-	console.log(`[PERF] TOTAL: ${(performance.now() - perfStart).toFixed(1)}ms`);
+	return misses;
 }
 
-/**
- * Clear the template cache (call when template image changes)
- */
+// ---------------------------------------------------------------------------
+// Compose visible tickets onto a canvas. This is SYNCHRONOUS and fast –
+// no WASM calls, just canvas drawImage from cached ImageBitmaps.
+// ---------------------------------------------------------------------------
+export function composeSheet(
+	canvas: HTMLCanvasElement,
+	geo: SheetGeometry,
+	viewport: Viewport
+): { rendered: number; total: number } {
+	const ctx = canvas.getContext('2d', { alpha: false });
+	if (!ctx) throw new Error('Failed to get 2D context');
+
+	// Work in CSS pixel space (caller must have set ctx.setTransform(dpr,...) already)
+	const cw = viewport.cssWidth;
+	const ch = viewport.cssHeight;
+	const { zoom, panX, panY } = viewport;
+
+	// Clear to gray (container bg)
+	ctx.fillStyle = '#f3f4f6'; // gray-100
+	ctx.fillRect(0, 0, cw, ch);
+
+	// Draw paper background (white rectangle with subtle shadow)
+	const paperX = panX;
+	const paperY = panY;
+	const paperW = geo.paperWidthMm * zoom;
+	const paperH = geo.paperHeightMm * zoom;
+
+	// Shadow
+	ctx.save();
+	ctx.shadowColor = 'rgba(0,0,0,0.15)';
+	ctx.shadowBlur = 12;
+	ctx.shadowOffsetX = 2;
+	ctx.shadowOffsetY = 2;
+	ctx.fillStyle = 'white';
+	ctx.fillRect(paperX, paperY, paperW, paperH);
+	ctx.restore();
+
+	// Ticket cell dimensions on canvas
+	const cellW = geo.ticketWidthMm * zoom;
+	const cellH = geo.ticketHeightMm * zoom;
+
+	if (cellW <= 0 || cellH <= 0) return { rendered: 0, total: geo.records.length };
+
+	let rendered = 0;
+	const total = geo.records.length;
+
+	for (let i = 0; i < total; i++) {
+		const row = Math.floor(i / geo.cols);
+		const col = i % geo.cols;
+
+		// Cell position in mm
+		const cellMmX = geo.marginLeftMm + col * (geo.ticketWidthMm + geo.spacingXMm);
+		const cellMmY = geo.marginTopMm + row * (geo.ticketHeightMm + geo.spacingYMm);
+
+		// Cell position on canvas
+		const cellCanvasX = cellMmX * zoom + panX;
+		const cellCanvasY = cellMmY * zoom + panY;
+
+		// Viewport culling – skip tickets entirely outside the canvas
+		if (
+			cellCanvasX + cellW < 0 ||
+			cellCanvasY + cellH < 0 ||
+			cellCanvasX > cw ||
+			cellCanvasY > ch
+		) {
+			continue;
+		}
+
+		// Look up cached bitmap
+		const key = JSON.stringify(geo.records[i]);
+		const cached = ticketCache.get(key);
+		if (!cached) continue; // Not yet rendered – will appear after prepareTickets
+
+		// Uniform scaling: maintain template aspect ratio within cell
+		const scaleX = cellW / cached.width;
+		const scaleY = cellH / cached.height;
+		const scale = Math.min(scaleX, scaleY);
+
+		const drawW = cached.width * scale;
+		const drawH = cached.height * scale;
+
+		// Center within cell
+		const drawX = cellCanvasX + (cellW - drawW) / 2;
+		const drawY = cellCanvasY + (cellH - drawH) / 2;
+
+		ctx.drawImage(cached.bitmap, drawX, drawY, drawW, drawH);
+		rendered++;
+	}
+
+	return { rendered, total };
+}
+
+// ---------------------------------------------------------------------------
+// Cache management
+// ---------------------------------------------------------------------------
 export function clearTemplateCache(): void {
 	templateCache = null;
 	clearTicketCache();
 }
 
-/**
- * Clear the ticket cache (call when stamps or template change)
- * Note: Layout changes (margins, spacing) don't require cache clearing - tickets are recomposed
- */
 export function clearTicketCache(): void {
+	// Close ImageBitmaps to free GPU memory
+	for (const entry of ticketCache.values()) {
+		entry.bitmap.close();
+	}
 	ticketCache.clear();
 	currentConfigHash = null;
-	console.log('[CACHE] Ticket cache cleared');
 }
 
-/**
- * Clear all caches
- */
 export function clearAllCaches(): void {
 	templateCache = null;
-	ticketCache.clear();
-	currentConfigHash = null;
-	console.log('[CACHE] All caches cleared');
+	clearTicketCache();
 }
 
-/**
- * Get cache statistics for debugging and monitoring
- */
 export function getCacheStats() {
 	return {
 		templateCached: templateCache !== null,
 		ticketsCached: ticketCache.size,
-		estimatedMemoryKB: Math.round(
-			(ticketCache.size > 0
-				? Array.from(ticketCache.values()).reduce((sum, ticket) => sum + ticket.data.byteLength, 0)
-				: 0) / 1024
-		),
-		configHash: currentConfigHash?.substring(0, 16) + '...' || 'none'
+		configHash: currentConfigHash ? currentConfigHash.substring(0, 20) + '…' : 'none'
 	};
 }
