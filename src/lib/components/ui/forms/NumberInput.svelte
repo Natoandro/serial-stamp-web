@@ -15,6 +15,7 @@
 		label?: string;
 		hint?: string;
 		error?: string;
+		title?: string;
 		oninput?: (value: number) => void;
 		onblur?: () => void;
 	}
@@ -33,6 +34,7 @@
 		label,
 		hint,
 		error,
+		title,
 		oninput,
 		onblur,
 		...props
@@ -63,6 +65,7 @@
 		{placeholder}
 		{required}
 		{disabled}
+		{title}
 		oninput={(e) => {
 			const target = e.target as HTMLInputElement;
 			const newValue = target.value === '' ? 0 : Number(target.value);

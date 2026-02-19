@@ -64,8 +64,19 @@ export interface SheetGeometry {
 	cols: number;
 	/** Serialised records for this page (simple key-value objects) */
 	records: Record<string, string>[];
-	/** Alignment mode for extra space distribution */
-	alignment: 'top-left' | 'center' | 'space-between';
+	/** Distribution mode for extra space */
+	distributionMode: 'expand' | 'align';
+	/** Position when distributionMode is 'align' */
+	marginAlignment?:
+		| 'top-left'
+		| 'top-center'
+		| 'top-right'
+		| 'middle-left'
+		| 'middle-center'
+		| 'middle-right'
+		| 'bottom-left'
+		| 'bottom-center'
+		| 'bottom-right';
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +230,8 @@ export async function computeSheetGeometry(
 		rows: layout.rows,
 		cols: layout.cols,
 		records: serialized,
-		alignment: layout.alignment
+		distributionMode: layout.distributionMode,
+		marginAlignment: layout.marginAlignment
 	};
 }
 
@@ -415,20 +427,40 @@ export async function composeSheet(
 	const extraX = availableWidth - totalGridWidth;
 	const extraY = availableHeight - totalGridHeight;
 
-	if (geo.alignment === 'center') {
-		// Center: distribute extra space evenly to both sides
-		effectiveMarginLeft = geo.marginLeftMm + extraX / 2;
-		effectiveMarginTop = geo.marginTopMm + extraY / 2;
-		// Spacing stays as specified
-	} else if (geo.alignment === 'space-between') {
-		// Space-between: margins stay exact, distribute extra space into spacing
+	if (geo.distributionMode === 'expand') {
+		// Expand mode: margins stay exact, expand spacing to fill available space
 		const totalTicketsWidth = geo.cols * geo.ticketWidthMm;
 		const totalTicketsHeight = geo.rows * geo.ticketHeightMm;
 		effectiveSpacingX = geo.cols > 1 ? (availableWidth - totalTicketsWidth) / (geo.cols - 1) : 0;
 		effectiveSpacingY = geo.rows > 1 ? (availableHeight - totalTicketsHeight) / (geo.rows - 1) : 0;
-		// Margins stay exact (already set above)
+	} else if (geo.distributionMode === 'align') {
+		// Align mode: spacing stays exact, distribute extra space to margins based on position
+		const align = geo.marginAlignment || 'top-left';
+
+		// Determine horizontal alignment
+		if (align.includes('left')) {
+			// Left-aligned: extra space goes to right
+			effectiveMarginLeft = geo.marginLeftMm;
+		} else if (align.includes('center')) {
+			// Center-aligned: distribute extra space evenly
+			effectiveMarginLeft = geo.marginLeftMm + extraX / 2;
+		} else {
+			// Right-aligned: extra space goes to left
+			effectiveMarginLeft = geo.marginLeftMm + extraX;
+		}
+
+		// Determine vertical alignment
+		if (align.startsWith('top')) {
+			// Top-aligned: extra space goes to bottom
+			effectiveMarginTop = geo.marginTopMm;
+		} else if (align.startsWith('middle')) {
+			// Middle-aligned: distribute extra space evenly
+			effectiveMarginTop = geo.marginTopMm + extraY / 2;
+		} else {
+			// Bottom-aligned: extra space goes to top
+			effectiveMarginTop = geo.marginTopMm + extraY;
+		}
 	}
-	// For 'top-left': margins exact on left/top, spacing exact, extra space goes to right/bottom
 
 	for (let i = 0; i < total; i++) {
 		const row = Math.floor(i / geo.cols);

@@ -56,6 +56,11 @@ These rules are the source of truth for how I should work in this repo. Keep thi
 - **Debounce real-time preview updates**: Use 100ms debounce for preview updates (WASM rendering is fast enough).
 - **Optimize preview rendering**: Use direct canvas rendering instead of data URLs, cache template conversions, and show previous preview while new one loads.
 - **Popups must escape overflow containers**: Use `fixed` positioning with `getBoundingClientRect()` for dropdowns that may be clipped by `overflow-y-auto` parents.
+- **Linked inputs for margins/spacing**: Provide UI toggles to link related numeric inputs:
+  - Margins: 3 modes (All, H/V, 4-Side) with buttons to switch between 1, 2, or 4 inputs
+  - Spacing: 2 modes (Same, H/V) with buttons to switch between 1 or 2 inputs
+  - Auto-detect current mode based on values equality
+  - When switching to linked mode, sync all linked values to match
 
 ## 7) Code quality defaults
 
@@ -132,19 +137,19 @@ These rules are the source of truth for how I should work in this repo. Keep thi
   ticket_width = scale * template_width
   ticket_height = scale * template_height
   ```
-- **Extra space**: One dimension fills available space exactly, the other has leftover space. Alignment controls how this leftover space is distributed.
-- **`top-left`**: 
-  - Left and top margins EXACT as specified.
-  - Spacing EXACT as specified.
-  - Extra space on constrained axis goes to right/bottom margin.
-- **`center`**: 
-  - Spacing EXACT as specified.
-  - Extra space on constrained axis distributed evenly to both margins (centered).
-- **`space-between`**: 
-  - All four margins EXACT as specified (absolute).
-  - Spacing on constrained axis INCREASES to fill all available space.
-  - Extra space distributed evenly between tickets as increased spacing.
-- **Implementation**: `computeSheetGeometry()` is async (loads template to get dimensions). Effective margins/spacing computed in `composeSheet()` based on alignment mode and which axis is constrained.
+- **Extra space**: One dimension fills available space exactly, the other has leftover space. Distribution mode controls how this leftover space is handled.
+- **Distribution modes**:
+  - **`expand` mode**: All four margins stay EXACT as specified. Extra space is distributed into spacing between tickets (spacing expands to fill).
+  - **`align` mode**: Spacing stays EXACT as specified. Extra space is distributed to margins based on selected position (3x3 grid).
+- **Align mode positions** (9 options via visual 3x3 selector):
+  - **Horizontal**: `left` (extra → right), `center` (extra → both sides), `right` (extra → left)
+  - **Vertical**: `top` (extra → bottom), `middle` (extra → both sides), `bottom` (extra → top)
+  - **Examples**:
+    - `top-left`: extra space goes to right and bottom margins
+    - `middle-center`: extra space distributed evenly to all margins (centered)
+    - `bottom-right`: extra space goes to left and top margins
+- **UI**: Two-step selector: radio buttons for mode (expand vs align), then 3x3 visual grid for position (shown only in align mode).
+- **Implementation**: `computeSheetGeometry()` is async (loads template to get dimensions). Effective margins/spacing computed in `composeSheet()` based on `distributionMode` and `marginAlignment`.
 
 ## 13) Text rendering in WASM
 

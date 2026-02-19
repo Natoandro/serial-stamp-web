@@ -161,7 +161,17 @@ export interface SheetLayout {
 	marginLeft: number; // mm
 	spacingX: number; // mm
 	spacingY: number; // mm
-	alignment: 'top-left' | 'center' | 'space-between'; // How to distribute extra space
+	distributionMode: 'expand' | 'align'; // How to distribute extra space
+	marginAlignment?:
+		| 'top-left'
+		| 'top-center'
+		| 'top-right'
+		| 'middle-left'
+		| 'middle-center'
+		| 'middle-right'
+		| 'bottom-left'
+		| 'bottom-center'
+		| 'bottom-right'; // Position when distributionMode is 'align'
 }
 
 // ============================================================================
