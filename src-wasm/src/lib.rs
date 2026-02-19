@@ -1,9 +1,11 @@
 mod ticket_renderer;
+mod font_loader;
 
 use image::{ImageBuffer, RgbaImage, Rgba};
 use serde::Deserialize;
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::future_to_promise;
 use ticket_renderer::{TicketRenderer, TemplateData, Stamp};
 
 #[derive(Deserialize)]
@@ -33,11 +35,30 @@ pub struct RenderConfig {
 /// Renders a complete sheet with tickets generated entirely in WASM.
 /// This is the main entry point for high-performance preview generation.
 ///
-/// Returns raw RGBA bytes that can be directly used with ImageData or canvas.
+/// Returns a Promise that resolves to raw RGBA bytes that can be directly used with ImageData or canvas.
 #[wasm_bindgen]
-pub fn render_sheet(config_json: &str, template_data: &[u8], font_data: &[u8]) -> Result<Vec<u8>, JsValue> {
+pub fn render_sheet(config_json: String, template_data: Vec<u8>, fonts_json: String) -> js_sys::Promise {
+    future_to_promise(async move {
+        render_sheet_impl(&config_json, &template_data, &fonts_json)
+            .await
+            .map(|bytes| JsValue::from(js_sys::Uint8Array::from(&bytes[..])))
+    })
+}
+
+async fn render_sheet_impl(config_json: &str, template_data: &[u8], fonts_json: &str) -> Result<Vec<u8>, JsValue> {
     let request: RenderConfig = serde_json::from_str(config_json)
         .map_err(|e| JsValue::from_str(&format!("Invalid config JSON: {}", e)))?;
+
+    // Parse fonts JSON (font name -> URL)
+    let fonts_urls: HashMap<String, String> = serde_json::from_str(fonts_json)
+        .map_err(|e| JsValue::from_str(&format!("Invalid fonts JSON: {}", e)))?;
+
+    // Fetch all fonts
+    let mut fonts_map: HashMap<String, Vec<u8>> = HashMap::new();
+    for (font_name, font_url) in fonts_urls {
+        let font_data = font_loader::load_font(&font_name, &font_url).await?;
+        fonts_map.insert(font_name, font_data);
+    }
 
     let config = &request.sheet_config;
     let dpi = request.dpi;
@@ -114,8 +135,8 @@ pub fn render_sheet(config_json: &str, template_data: &[u8], font_data: &[u8]) -
         data: template_data.to_vec(),
     };
 
-    // Create ticket renderer
-    let renderer = TicketRenderer::new(template, request.stamps, font_data.to_vec())
+    // Create ticket renderer with all fonts
+    let renderer = TicketRenderer::new(template, request.stamps, fonts_map)
         .map_err(|e| JsValue::from_str(&e))?;
 
     // Convert margins and spacing to pixels (must match TypeScript's Math.round())

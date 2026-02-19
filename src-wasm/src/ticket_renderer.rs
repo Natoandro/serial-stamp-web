@@ -68,11 +68,11 @@ pub struct QrCodeStamp {
 pub struct TicketRenderer {
     template_image: RgbaImage,
     stamps: Vec<Stamp>,
-    font_data: Vec<u8>,
+    fonts: HashMap<String, Vec<u8>>,
 }
 
 impl TicketRenderer {
-    pub fn new(template_data: TemplateData, stamps: Vec<Stamp>, font_data: Vec<u8>) -> Result<Self, String> {
+    pub fn new(template_data: TemplateData, stamps: Vec<Stamp>, fonts: HashMap<String, Vec<u8>>) -> Result<Self, String> {
         // Convert template data bytes to RgbaImage
         let template_image = ImageBuffer::from_raw(
             template_data.width,
@@ -81,14 +81,16 @@ impl TicketRenderer {
         )
         .ok_or("Failed to create template image from raw data")?;
 
-        // Validate font data
-        FontRef::try_from_slice(&font_data)
-            .map_err(|e| format!("Failed to load font: {}", e))?;
+        // Validate all fonts
+        for (font_name, font_bytes) in &fonts {
+            FontRef::try_from_slice(font_bytes)
+                .map_err(|e| format!("Failed to load font '{}': {}", font_name, e))?;
+        }
 
         Ok(TicketRenderer {
             template_image,
             stamps,
-            font_data,
+            fonts,
         })
     }
 
@@ -146,9 +148,13 @@ impl TicketRenderer {
             return Ok(());
         }
 
-        // Load font from stored font data
-        let font = FontRef::try_from_slice(&self.font_data)
-            .map_err(|e| format!("Failed to load font: {}", e))?;
+        // Get font data for this stamp's font family
+        let font_data = self.fonts.get(&stamp.font_family)
+            .ok_or_else(|| format!("Font '{}' not found in loaded fonts", stamp.font_family))?;
+
+        // Load font from font data
+        let font = FontRef::try_from_slice(font_data)
+            .map_err(|e| format!("Failed to load font '{}': {}", stamp.font_family, e))?;
 
         // Stamp coordinates are relative to ORIGINAL template image size
         // (x, y) is the ANCHOR POINT, not a bounding box

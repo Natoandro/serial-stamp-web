@@ -1,6 +1,6 @@
 import type { Project, SheetLayout, Stamp } from '$lib/types';
+import { AVAILABLE_FONTS } from '$lib/types';
 import { generateRecords } from '$lib/engine/data';
-import { loadFont } from './fontLoader';
 
 let wasmModule: typeof import('$lib/wasm/pdf_generator') | null = null;
 let wasmInitialized = false;
@@ -92,14 +92,24 @@ function serializeStamps(stamps: Stamp[]): unknown[] {
 }
 
 /**
- * Get font name from stamps (returns first text stamp's font, or default)
+ * Get font URLs map from text stamps
  */
-function getFontFromStamps(stamps: Stamp[]): string {
-	const textStamp = stamps.find((s) => s.type === 'text');
-	if (textStamp && textStamp.type === 'text') {
-		return textStamp.fontFamily;
+function getFontUrlsFromStamps(stamps: Stamp[]): Record<string, string> {
+	const fontsObject: Record<string, string> = {};
+	for (const stamp of stamps) {
+		if (stamp.type === 'text') {
+			const fontDef = AVAILABLE_FONTS.find((f) => f.name === stamp.fontFamily);
+			if (fontDef && !fontsObject[stamp.fontFamily]) {
+				fontsObject[stamp.fontFamily] = fontDef.url;
+			}
+		}
 	}
-	return 'Roboto'; // Default font
+	// Ensure at least one font (default)
+	if (Object.keys(fontsObject).length === 0) {
+		const defaultFont = AVAILABLE_FONTS[0];
+		fontsObject[defaultFont.name] = defaultFont.url;
+	}
+	return fontsObject;
 }
 
 /**
@@ -165,13 +175,13 @@ export async function generateWasmPreview(project: Project, layout: SheetLayout)
 	const width = Math.round(paperWidth * pixelsPerMm);
 	const height = Math.round(paperHeight * pixelsPerMm);
 
-	// Load font data for text stamps
-	const fontName = getFontFromStamps(project.stamps);
-	const fontData = await loadFont(fontName);
+	// Get font URLs for WASM to fetch
+	const fontsObject = getFontUrlsFromStamps(project.stamps);
 
-	// Call WASM render function - pass template data and font data as separate Uint8Arrays
+	// Call WASM render function - pass template data and fonts URLs (returns Promise)
 	const configJson = JSON.stringify(config);
-	const rgbaBytes = wasm.render_sheet(configJson, templateData.data, new Uint8Array(fontData));
+	const fontsJson = JSON.stringify(fontsObject);
+	const rgbaBytes = await wasm.render_sheet(configJson, templateData.data, fontsJson);
 
 	// Validate data length
 	if (rgbaBytes.length !== width * height * 4) {
@@ -272,13 +282,13 @@ export async function renderWasmPreviewToCanvas(
 	const width = Math.round(paperWidth * pixelsPerMm);
 	const height = Math.round(paperHeight * pixelsPerMm);
 
-	// Load font data for text stamps
-	const fontName = getFontFromStamps(project.stamps);
-	const fontData = await loadFont(fontName);
+	// Get font URLs for WASM to fetch
+	const fontsObject = getFontUrlsFromStamps(project.stamps);
 
-	// Call WASM render function - pass template data and font data as separate Uint8Arrays
+	// Call WASM render function - pass template data and fonts URLs (returns Promise)
 	const configJson = JSON.stringify(config);
-	const rgbaBytes = wasm.render_sheet(configJson, templateData.data, new Uint8Array(fontData));
+	const fontsJson = JSON.stringify(fontsObject);
+	const rgbaBytes = await wasm.render_sheet(configJson, templateData.data, fontsJson);
 
 	// Validate data length
 	if (rgbaBytes.length !== width * height * 4) {
